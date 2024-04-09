@@ -27,14 +27,10 @@ class MainWindow(PlotWindow):
         # file submenu(step1&5):导入文件、每一步处理后的图谱、最终筛选出的mz、rt、intensity（csv?）
         file = menu.addMenu('File')
 
-        file_import = QtWidgets.QMenu('Open', self)
         # 导入文件
-        file_import_mzML = QtWidgets.QAction('Open *.mzML', self)
-        file_import_mzML.triggered.connect(self._open_file)
-        file_import.addAction(file_import_mzML)
-        file_import_folder_mzML = QtWidgets.QAction('Open folder with *.mzML files', self)
-        file_import_folder_mzML.triggered.connect(self._open_folder)
-        file_import.addAction(file_import_folder_mzML)
+        file_import = QtWidgets.QAction('Open *.mzML', self)
+        file_import.triggered.connect(self._open_file)
+        file.addAction(file_import)
 
         file_export = QtWidgets.QMenu('Save', self)
         # 导出当前图谱为图片
@@ -55,7 +51,6 @@ class MainWindow(PlotWindow):
         # file_clear_features.triggered.connect(self._list_of_features.clear)
         # file_clear.addAction(file_clear_features)
 
-        file.addMenu(file_import)
         file.addMenu(file_export)
         # file.addMenu(file_clear)
 
@@ -125,12 +120,6 @@ class MainWindow(PlotWindow):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzML (*.mzML)')[0]
         for name in files_names:
             self._list_of_files.addFile(name)
-
-    def _open_folder(self):
-        path = str(QtWidgets.QFileDialog.getExistingDirectory())
-        pass
-        # for name in sorted(find_mzML(path)):
-        #     self._list_of_files.addFile(name)
 
     def _export_features(self, mode):
         if self._list_of_files.count() > 0:
