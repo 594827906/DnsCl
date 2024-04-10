@@ -5,6 +5,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
 import pymzml
+import pyteomics.mzxml as mzxml
 import numpy as np
 
 
@@ -140,10 +141,10 @@ class PlotWindow(QtWidgets.QMainWindow):
         plotted = False
         if label not in self._label2line:
             path = self._list_of_files.file2path[file]
-            construct_tic(path, label, mode)
+            construct_mzxml(path, label, mode)
             pb = ProgressBarsListItem(f'Plotting: {file}', parent=self._pb_list)
             self._pb_list.addItem(pb)
-            worker = Worker(construct_tic, path, label, mode)
+            worker = Worker(construct_mzxml, path, label, mode)
             worker.signals.progress.connect(pb.setValue)
             worker.signals.result.connect(self.plotter)
             worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
@@ -285,4 +286,19 @@ def construct_tic(path, label, mode, progress_callback=None):
                 progress_callback.emit(int(i * 100 / spectrum_count))
     if t_measure == 'second':
         time = np.array(time) / 60
+    return {'x': time, 'y': tic, 'label': label, 'mode': mode}
+
+
+def construct_mzxml(path, label, mode, progress_callback=None):
+    run = mzxml.read(path)
+    time = []
+    tic = []
+    # spectrum_count = run.get_spectrum_count()
+    for i, scan in enumerate(run):
+        if scan['msLevel'] == 1:
+            tic.append(scan['totIonCurrent'])  # get total ion of scan
+            t = scan['retentionTime']  # get scan time
+            time.append(t)
+            # if progress_callback is not None and not i % 10:
+            #     progress_callback.emit(int(i * 100 / spectrum_count))
     return {'x': time, 'y': tic, 'label': label, 'mode': mode}

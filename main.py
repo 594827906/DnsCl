@@ -28,7 +28,7 @@ class MainWindow(PlotWindow):
         file = menu.addMenu('File')
 
         # 导入文件
-        file_import = QtWidgets.QAction('Open *.mzML', self)
+        file_import = QtWidgets.QAction('Open *.mzXML', self)
         file_import.triggered.connect(self._open_file)
         file.addAction(file_import)
 
@@ -38,8 +38,8 @@ class MainWindow(PlotWindow):
         file_export_features_png.triggered.connect(partial(self._export_features, 'png'))
         file_export.addAction(file_export_features_png)
         # 导出当前图谱为新mzml
-        file_export_features_mzml = QtWidgets.QAction('Save current spectrogram as new *.mzml files', self)
-        file_export_features_mzml.triggered.connect(partial(self._export_features, 'mzml'))
+        file_export_features_mzml = QtWidgets.QAction('Save current spectrogram as new *.mzxml files', self)
+        file_export_features_mzml.triggered.connect(partial(self._export_features, 'mzxml'))
         file_export.addAction(file_export_features_mzml)
         # 导出最终csv
         file_export_features_csv = QtWidgets.QAction('Save a *.csv file with detected features', self)
@@ -83,7 +83,7 @@ class MainWindow(PlotWindow):
         self.setWindowTitle('DnsCl')
 
         # 左侧布局
-        file_list_label = QtWidgets.QLabel('文件列表：')
+        file_list_label = QtWidgets.QLabel('File list：')
         self._list_of_files = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout()
@@ -117,7 +117,7 @@ class MainWindow(PlotWindow):
         self.setCentralWidget(widget)
 
     def _open_file(self):
-        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzML (*.mzML)')[0]
+        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML);;mzML (*.mzML)')[0]
         for name in files_names:
             self._list_of_files.addFile(name)
 
@@ -133,7 +133,7 @@ class MainWindow(PlotWindow):
                 if file_name:
                     # table.to_csv(file_name)
                     pass
-            elif mode == 'mzml':
+            elif mode == 'mzxml':
                 pass
             elif mode == 'png':
                 directory = str(QtWidgets.QFileDialog.getExistingDirectory(self, 'Choose a directory where to save'))
