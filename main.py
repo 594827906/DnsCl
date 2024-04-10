@@ -11,7 +11,7 @@ class MainWindow(PlotWindow):
         super().__init__()
         # self.init_data()
         self._create_menu()
-        self.resize(1344, 756)
+        self.resize(1350, 700)
         self.init_ui()
         self.setStyleSheet(style_sheet)
         self.show()
@@ -279,7 +279,7 @@ class FileListWidget(ClickableListWidget):
 style_sheet = """
 QMenuBar{
     background-color: #CAE0E4;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: bold;
     color: #52404D;
     font-family: Times New Roman
@@ -289,8 +289,7 @@ QMenuBar::item::selected{
 }
 QMenu{
     background-color: #CAE0E4;
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 17px;
     color: #52404D;
     font-family: Times New Roman
 }
