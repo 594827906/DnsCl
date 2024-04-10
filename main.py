@@ -278,7 +278,7 @@ class FileListWidget(ClickableListWidget):
 
 style_sheet = """
 QMenuBar{
-    background-color: #CAE0E4;
+    background-color: #DDE9EE;
     font-size: 17px;
     font-weight: bold;
     color: #52404D;
@@ -297,7 +297,7 @@ QMenu::item::selected{
     background-color: #84B6C0
 }
 QMainWindow{
-    background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:1, y2:0, stop:0 #84B6C0, stop:1 #CAE0E4)   
+    background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:1, y2:0, stop:0 #84B6C0, stop:1 #DDE9EE)   
 }
 """
 
