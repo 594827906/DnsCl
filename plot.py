@@ -15,7 +15,8 @@ class PlotWindow(QtWidgets.QMainWindow):
 
         self._thread_pool = QtCore.QThreadPool()
         self._pb_list = ProgressBarsList(self)
-        self._plotted_list = []
+        self.sample_plotted_list = []
+        self.blank_plotted_list = []
         self._plotted_list = []
 
         self._feature_parameters = None
@@ -139,8 +140,8 @@ class PlotWindow(QtWidgets.QMainWindow):
     def plot_tic(self, file, mode):
         label = f'{file}'
         plotted = False
+        path = self._list_of_files.file2path[file]
         if label not in self._label2line:
-            path = self._list_of_files.file2path[file]
             construct_mzxml(path, label, mode)
             pb = ProgressBarsListItem(f'Plotting: {file}', parent=self._pb_list)
             self._pb_list.addItem(pb)
@@ -150,16 +151,14 @@ class PlotWindow(QtWidgets.QMainWindow):
             worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
 
             self._thread_pool.start(worker)
-
             self._plotted_list.append(label)
 
             plotted = True
-        return plotted, label
+        return plotted, path
 
     def delete_line(self, label):
         self.fig_sample.cla()
         self._label2line.clear()
-        # self.sample_plotted_list.clear()
         self._plotted_list.remove(label)  # delete item from list
         self._canvas.draw_idle()
 
@@ -184,7 +183,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._canvas.draw()
 
 
-class EICParameterWindow(QtWidgets.QDialog):
+class ParameterWindow(QtWidgets.QDialog):
     def __init__(self, parent: PlotWindow):
         self.parent = parent
         super().__init__(self.parent)

@@ -1,10 +1,11 @@
 import sys
 import os
-from plot import PlotWindow, EICParameterWindow
+from plot import PlotWindow, ParameterWindow
 # from utils.show_list import find_mzML, PeakListWidget, ROIListWidget, ProgressBarsListItem
 # from utils.annotation_window import AnnotationParameterWindow, ReAnnotationParameterWindow
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
+from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
 
 class MainWindow(PlotWindow):
     def __init__(self):
@@ -17,7 +18,6 @@ class MainWindow(PlotWindow):
         self.show()
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)  # https://blog.csdn.net/fjunchao/article/details/117551577
-        # self._list_of_files.connectDoubleClick(self.FileListPlot)  # 双击绘制TIC图
         self._list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
 
     def _create_menu(self):
@@ -57,12 +57,9 @@ class MainWindow(PlotWindow):
         # spectrogram simplification submenu(step2)
         simplification = menu.addMenu('Simplification')
 
-        Repeatability = QtWidgets.QAction('Repeatability', self)
-        Repeatability.triggered.connect(self.repeatability)
-        simplification.addAction(Repeatability)
-        Variability = QtWidgets.QAction('Variability', self)
-        Variability.triggered.connect(self.variability)
-        simplification.addAction(Variability)
+        rep_var = QtWidgets.QAction('Repeatability and Variability', self)
+        rep_var.triggered.connect(self.rep_var)
+        simplification.addAction(rep_var)
         Mass_defect_limit = QtWidgets.QAction('Mass defect limit', self)
         Mass_defect_limit.triggered.connect(self.mass_defect_limit)
         simplification.addAction(Mass_defect_limit)
@@ -117,7 +114,7 @@ class MainWindow(PlotWindow):
         self.setCentralWidget(widget)
 
     def _open_file(self):
-        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML);;mzML (*.mzML)')[0]
+        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML)')[0]
         for name in files_names:
             self._list_of_files.addFile(name)
 
@@ -150,22 +147,39 @@ class MainWindow(PlotWindow):
     def clear_btn(self):
         self._list_of_files.clear()
 
-    def repeatability(self):
-        pass
+    def rep_var(self):  # TODO:1.从_list_of_files传入blank/sample path
+        if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
 
-    def variability(self):
-        pass
+            sample = obtain_MS1(self.sample_plotted_list[0])
+            blank = obtain_MS1(self.blank_plotted_list[0])
 
-    def mass_defect_limit(self):
-        pass
+            sample_rt = RT_screening(sample, lower_rt=2.5, upper_rt=30.0)
+            blank_rt = RT_screening(blank, lower_rt=2.5, upper_rt=30.0)
 
-    def FileListPlot(self, item):
-        for file in self.get_selected_files():
-            file = file.text()
-            plotted, label = self.plot_tic(file)
-            # self.plot_tic(file)
-            if plotted:
-                self._plotted_list.append(label)
+            sample_mz = mz_screening(sample_rt, lower_mz=150.0, upper_mz=1000.0)
+            blank_mz = mz_screening(blank_rt, lower_mz=150.0, upper_mz=1000.0)
+
+            sample_intensity = intens_screening(sample_mz, lower_inten=10000)
+            blank_intensity = intens_screening(blank_mz, lower_inten=10000)
+
+            sample_mdl = mass_def(sample_intensity)
+            blank_mdl = mass_def(blank_intensity)
+
+            sample_bin = bin_peaks(sample_mdl)
+            blank_bin = bin_peaks(blank_mdl)
+
+            sample_pre = check_rep_var(sample_bin)
+            blank_pre = check_rep_var(blank_bin)
+
+            print('process finished')
+        else:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText('You should import 2 files as sample and blank each, first')
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+
+    def mass_defect_limit(self):  # TODO:需要弹窗
+        pass
 
 
 class FileListMenu(QtWidgets.QMenu):
@@ -190,13 +204,13 @@ class FileListMenu(QtWidgets.QMenu):
         for file in self.parent.get_selected_files():
             file = file.text()
             if action == sample:
-                plotted, label = self.parent.plot_tic(file, mode='sample')
+                plotted, path = self.parent.plot_tic(file, mode='sample')
                 if plotted:
-                    self.parent._plotted_list.append(label)
+                    self.parent.sample_plotted_list.append(path)
             elif action == blank:
-                plotted, label = self.parent.plot_tic(file, mode='blank')
+                plotted, path = self.parent.plot_tic(file, mode='blank')
                 if plotted:
-                    self.parent._plotted_list.append(label)
+                    self.parent.blank_plotted_list.append(path)
 
         if action == close:
             self.close_files()
