@@ -1,10 +1,11 @@
 import sys
 import os
-from plot import PlotWindow, ParameterWindow
+from plot import PlotWindow, ParameterWindow, ProgressBarsListItem
 # from utils.show_list import find_mzML, PeakListWidget, ROIListWidget, ProgressBarsListItem
 # from utils.annotation_window import AnnotationParameterWindow, ReAnnotationParameterWindow
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
+from utils.threading import Worker
 from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
 
 class MainWindow(PlotWindow):
@@ -179,7 +180,8 @@ class MainWindow(PlotWindow):
             msg.exec_()
 
     def mass_defect_limit(self):  # TODO:需要弹窗
-        pass
+        subwindow = ParameterWindow(self)
+        subwindow.show()
 
 
 class FileListMenu(QtWidgets.QMenu):

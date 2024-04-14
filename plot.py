@@ -1,11 +1,12 @@
 from functools import partial
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
 import pymzml
 import pyteomics.mzxml as mzxml
+from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
 import numpy as np
 
 
@@ -187,45 +188,149 @@ class ParameterWindow(QtWidgets.QDialog):
     def __init__(self, parent: PlotWindow):
         self.parent = parent
         super().__init__(self.parent)
-        self.setWindowTitle('EIC plot option')
+        self.setWindowTitle('Mass defect limit option')
 
+        # 字体设置
+        font = QtGui.QFont()
+        font.setFamily('Arial')
+        font.setBold(True)
+        font.setPixelSize(15)
+        font.setWeight(75)
+
+        range_setting = QtWidgets.QFormLayout()
+
+        rt_label = QtWidgets.QLabel("RT range")
+        rt_label.setFont(font)
+        self.lower_rt = QtWidgets.QLineEdit()
+        self.lower_rt.setText('2.5')
+        self.lower_rt.setFixedSize(60, 30)
+        self.lower_rt.setFont(font)
+        self.upper_rt = QtWidgets.QLineEdit()
+        self.upper_rt.setText('30.0')
+        self.upper_rt.setFixedSize(60, 30)
+        self.upper_rt.setFont(font)
+        rt_layout = QtWidgets.QHBoxLayout()
+        rt_text1 = QtWidgets.QLabel(self)
+        rt_text1.setText('to')
+        rt_text1.setFont(font)
+        rt_text2 = QtWidgets.QLabel(self)
+        rt_text2.setText('min.')
+        rt_text2.setFont(font)
+        rt_layout.addWidget(self.lower_rt)
+        rt_layout.addWidget(rt_text1)
+        rt_layout.addWidget(self.upper_rt)
+        rt_layout.addWidget(rt_text2)
+
+        mz_label = QtWidgets.QLabel("m/z range")
+        mz_label.setFont(font)
+        self.lower_mz = QtWidgets.QLineEdit()
+        self.lower_mz.setText('150.0')
+        self.lower_mz.setFixedSize(60, 30)
+        self.lower_mz.setFont(font)
+        self.upper_mz = QtWidgets.QLineEdit()
+        self.upper_mz.setText('1000.0')
+        self.upper_mz.setFixedSize(60, 30)
+        self.upper_mz.setFont(font)
         mz_layout = QtWidgets.QHBoxLayout()
-        mz_label = QtWidgets.QLabel(self)
-        mz_label.setText('m/z=')
-        self.mz_getter = QtWidgets.QLineEdit(self)
-        self.mz_getter.setText('100.000')
-        mz_layout.addWidget(mz_label)
-        mz_layout.addWidget(self.mz_getter)
+        mz_text1 = QtWidgets.QLabel(self)
+        mz_text1.setText('to')
+        mz_text1.setFont(font)
+        mz_text2 = QtWidgets.QLabel(self)
+        mz_text2.setText('Da')
+        mz_text2.setFont(font)
+        mz_layout.addWidget(self.lower_mz)
+        mz_layout.addWidget(mz_text1)
+        mz_layout.addWidget(self.upper_mz)
+        mz_layout.addWidget(mz_text2)
 
-        delta_layout = QtWidgets.QHBoxLayout()
-        delta_label = QtWidgets.QLabel(self)
-        delta_label.setText('delta=±')
-        self.delta_getter = QtWidgets.QLineEdit(self)
-        self.delta_getter.setText('0.005')
-        delta_layout.addWidget(delta_label)
-        delta_layout.addWidget(self.delta_getter)
+        defect_label = QtWidgets.QLabel("mass defect")
+        defect_label.setFont(font)
+        self.lower_mass = QtWidgets.QLineEdit()
+        self.lower_mass.setText('600')
+        self.lower_mass.setFixedSize(60, 30)
+        self.lower_mass.setFont(font)
+        self.upper_mass = QtWidgets.QLineEdit()
+        self.upper_mass.setText('1000')
+        self.upper_mass.setFixedSize(60, 30)
+        self.upper_mass.setFont(font)
+        defect_layout = QtWidgets.QHBoxLayout()
+        defect_text1 = QtWidgets.QLabel(self)
+        defect_text1.setText('to')
+        defect_text1.setFont(font)
+        defect_text2 = QtWidgets.QLabel(self)
+        defect_text2.setText('mD')
+        defect_text2.setFont(font)
+        defect_layout.addWidget(self.lower_mass)
+        defect_layout.addWidget(defect_text1)
+        defect_layout.addWidget(self.upper_mass)
+        defect_layout.addWidget(defect_text2)
 
-        plot_button = QtWidgets.QPushButton('Plot')
-        plot_button.clicked.connect(self.plot)
+        tolerance_label = QtWidgets.QLabel("Mass tolerance")
+        tolerance_label.setFont(font)
+        para_setting = QtWidgets.QFormLayout()
+        para_setting.alignment()
+        self.mass_tolerance = QtWidgets.QLineEdit()
+        self.mass_tolerance.setText('10')
+        self.mass_tolerance.setFixedSize(60, 30)
+        self.mass_tolerance.setFont(font)
+        tolerance_layout = QtWidgets.QHBoxLayout()
+        tolerance_text = QtWidgets.QLabel(self)
+        tolerance_text.setText('ppm')
+        tolerance_text.setFont(font)
+        tolerance_layout.addWidget(self.mass_tolerance)
+        tolerance_layout.addWidget(tolerance_text)
+        tolerance_layout.addStretch()  # 什么用处？
+
+        thd_label = QtWidgets.QLabel("Intensity Threshold")
+        thd_label.setFont(font)
+        self.intensity_thd = QtWidgets.QLineEdit()
+        self.intensity_thd.setText('10000')
+        self.intensity_thd.setFixedSize(60, 30)
+        self.intensity_thd.setFont(font)
+        thd_layout = QtWidgets.QHBoxLayout()
+        thd_text = QtWidgets.QLabel(self)
+        thd_text.setText('a.u.')
+        thd_text.setFont(font)
+        thd_layout.addWidget(self.intensity_thd)
+        thd_layout.addWidget(thd_text)
+        # thd_layout.addStretch()
+
+        range_setting.addRow(rt_label, rt_layout)
+        range_setting.addRow(mz_label, mz_layout)
+        range_setting.addRow(defect_label, defect_layout)
+        # range_setting.setLabelAlignment(Q)
+
+        para_setting.addRow(tolerance_label, tolerance_layout)
+        para_setting.addRow(thd_label, thd_layout)
+
+        ok_button = QtWidgets.QPushButton('OK')
+        ok_button.clicked.connect(self.defect)
+        ok_button.setFont(font)
+        ok_button.resize(80, 80)  # 未生效
 
         layout = QtWidgets.QVBoxLayout()
-        layout.addLayout(mz_layout)
-        layout.addLayout(delta_layout)
-        layout.addWidget(plot_button)
+        layout.addLayout(range_setting)
+        layout.addLayout(para_setting)
+        layout.addWidget(ok_button)
         self.setLayout(layout)
 
-    def plot(self):
+    def defect(self):
         try:
-            mz = float(self.mz_getter.text())
-            delta = float(self.delta_getter.text())
+            lower_rt = float(self.lower_rt.text())
+            upper_rt = float(self.upper_rt.text())
+            lower_mz = float(self.lower_mz.text())
+            upper_mz = float(self.upper_mz.text())
+            lower_mass = float(self.lower_mass.text())
+            upper_mass = float(self.upper_mass.text())
+            mass_tolerance = float(self.mass_tolerance.text())
+            intensity_thd = float(self.intensity_thd.text())
             for file in self.parent.get_selected_files():
                 file = file.text()
-                self.parent.plot_eic(file, mz, delta)
             self.close()
         except ValueError:
             # popup window with exception
             msg = QtWidgets.QMessageBox(self)
-            msg.setText("'m/z' and 'delta' should be float numbers!")
+            msg.setText("Check parameters, something is wrong!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
