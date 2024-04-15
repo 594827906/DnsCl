@@ -1,12 +1,13 @@
 import sys
 import os
-from plot import PlotWindow, ParameterWindow, ProgressBarsListItem
+from plot import PlotWindow, ParameterWindow1, ParameterWindow2, ProgressBarsListItem
 # from utils.show_list import find_mzML, PeakListWidget, ROIListWidget, ProgressBarsListItem
 # from utils.annotation_window import AnnotationParameterWindow, ReAnnotationParameterWindow
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
 from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
+
 
 class MainWindow(PlotWindow):
     def __init__(self):
@@ -20,6 +21,7 @@ class MainWindow(PlotWindow):
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)  # https://blog.csdn.net/fjunchao/article/details/117551577
         self._list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
+        self._list_of_process.connectRightClick(partial(ProcessListMenu, self))  # 右键打开菜单
 
     def _create_menu(self):
         # menu = QtWidgets.QMenuBar(self)
@@ -43,7 +45,7 @@ class MainWindow(PlotWindow):
         file_export_features_mzml.triggered.connect(partial(self._export_features, 'mzxml'))
         file_export.addAction(file_export_features_mzml)
         # 导出最终csv
-        file_export_features_csv = QtWidgets.QAction('Save a *.csv file with detected features', self)
+        file_export_features_csv = QtWidgets.QAction('Save current spectrogram as *.csv files', self)
         file_export_features_csv.triggered.connect(partial(self._export_features, 'csv'))
         file_export.addAction(file_export_features_csv)
 
@@ -68,7 +70,7 @@ class MainWindow(PlotWindow):
         # background subtraction denoise(step3)
         denoise = menu.addMenu('Denoising')
         background_subtraction_denoise = QtWidgets.QAction("background subtraction denoise", self)
-        # background_subtraction_denoise.triggered.connect(self.denoise)
+        background_subtraction_denoise.triggered.connect(self.denoise)
         denoise.addAction(background_subtraction_denoise)
 
         # peak matching(step4)
@@ -83,10 +85,14 @@ class MainWindow(PlotWindow):
         # 左侧布局
         file_list_label = QtWidgets.QLabel('File list：')
         self._list_of_files = FileListWidget()
+        process_list_label = QtWidgets.QLabel('Process list：')
+        self._list_of_process = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout()
         layout_left.addWidget(file_list_label)
-        layout_left.addWidget(self._list_of_files, 5)
+        layout_left.addWidget(self._list_of_files, 3)
+        layout_left.addWidget(process_list_label)
+        layout_left.addWidget(self._list_of_process, 6)
 
         # 中间布局
         layout_mid = QtWidgets.QHBoxLayout()
@@ -148,7 +154,7 @@ class MainWindow(PlotWindow):
     def clear_btn(self):
         self._list_of_files.clear()
 
-    def rep_var(self):  # TODO:1.从_list_of_files传入blank/sample path
+    def rep_var(self):
         if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
 
             sample = obtain_MS1(self.sample_plotted_list[0])
@@ -179,9 +185,72 @@ class MainWindow(PlotWindow):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def mass_defect_limit(self):  # TODO:需要弹窗
-        subwindow = ParameterWindow(self)
-        subwindow.show()
+    def mass_defect_limit(self):
+        if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
+            sample = self.sample_plotted_list[0]
+            blank = self.blank_plotted_list[0]
+            subwindow = ParameterWindow1(sample, blank, self)
+            subwindow.show()
+        else:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText('You should import 2 files as sample and blank each, first')
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+
+    def denoise(self):
+        if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
+            sample = self.sample_plotted_list[0]
+            blank = self.blank_plotted_list[0]
+            subwindow = ParameterWindow2(sample, blank, self)
+            subwindow.show()
+        else:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText('You should import 2 files as sample and blank each, first')
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+
+
+class ProcessListMenu(QtWidgets.QMenu):
+    def __init__(self, parent: MainWindow):
+        self.parent = parent
+        super().__init__(parent)
+
+        menu = QtWidgets.QMenu(parent)
+
+        csv = QtWidgets.QAction('Save as .csv', parent)
+        blank = QtWidgets.QAction('Plot as blank', parent)
+        clear = QtWidgets.QAction('Clear plot', parent)
+        close = QtWidgets.QAction('Close', parent)
+
+        menu.addAction(csv)
+        menu.addAction(blank)
+        menu.addAction(clear)
+        menu.addAction(close)
+
+        action = menu.exec_(QtGui.QCursor.pos())
+
+        for file in self.parent.get_selected_files():
+            file = file.text()
+            if action == csv:
+                sample_pre.to_csv('sample_pre.csv')
+            elif action == blank:
+                plotted, path = self.parent.plot_tic(file, mode='blank')
+                if plotted:
+                    self.parent.blank_plotted_list.append(path)
+
+        if action == close:
+            self.close_files()
+        elif action == clear:
+            self.delete_tic()
+
+    def delete_tic(self):  # TODO:暂时只能全部清空，能否选中清除
+        for item in self.parent.get_selected_files():
+            self.parent.delete_line(item.text())
+        self.parent.refresh_canvas()
+
+    def close_files(self):
+        for item in self.parent.get_selected_files():
+            self.parent.close_file(item)
 
 
 class FileListMenu(QtWidgets.QMenu):
@@ -294,7 +363,7 @@ class FileListWidget(ClickableListWidget):
 
 style_sheet = """
 QMenuBar{
-    background-color: #DDE9EE;
+    background-color: #E9EDF2;
     font-size: 17px;
     font-weight: bold;
     color: #52404D;
@@ -313,7 +382,7 @@ QMenu::item::selected{
     background-color: #84B6C0
 }
 QMainWindow{
-    background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:1, y2:0, stop:0 #84B6C0, stop:1 #DDE9EE)   
+    background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:1, y2:0, stop:0 #84B6C0, stop:1 #E9EDF2)   
 }
 """
 

@@ -184,11 +184,13 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._canvas.draw()
 
 
-class ParameterWindow(QtWidgets.QDialog):
-    def __init__(self, parent: PlotWindow):
+class ParameterWindow1(QtWidgets.QDialog):
+    def __init__(self, sample, blank, parent: PlotWindow):
         self.parent = parent
         super().__init__(self.parent)
         self.setWindowTitle('Mass defect limit option')
+        self.sample = sample
+        self.blank = blank
 
         # 字体设置
         font = QtGui.QFont()
@@ -324,9 +326,27 @@ class ParameterWindow(QtWidgets.QDialog):
             upper_mass = float(self.upper_mass.text())
             mass_tolerance = float(self.mass_tolerance.text())
             intensity_thd = float(self.intensity_thd.text())
-            for file in self.parent.get_selected_files():
-                file = file.text()
             self.close()
+
+            # pd = QtWidgets.QProgressDialog(self)
+            # pd.setWindowTitle("Please wait...")
+            # pd.setLabelText('Processing...')
+            # pd.setCancelButton(None)
+            # pd.setRange(0, 0)
+            # pd.show()
+
+            sample = obtain_MS1(self.sample)
+            blank = obtain_MS1(self.blank)
+            sample_rt = RT_screening(sample, lower_rt=lower_rt, upper_rt=upper_rt)
+            sample_mz = mz_screening(sample_rt, lower_mz=lower_mz, upper_mz=upper_mz)
+            sample_intensity = intens_screening(sample_mz, lower_inten=intensity_thd)
+            sample_mdl = mass_def(sample_intensity, lower_mass=lower_mass, upper_mass=upper_mass)
+            sample_bin = bin_peaks(sample_mdl)
+            sample_pre = check_rep_var(sample_bin)
+            sample_pre.to_csv('sample_pre.csv')
+            self._list_of_process.addFile('sample_pre.csv')
+            # pd.setAutoClose(True)
+            print('end')
         except ValueError:
             # popup window with exception
             msg = QtWidgets.QMessageBox(self)
@@ -334,6 +354,21 @@ class ParameterWindow(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
+
+class ParameterWindow2(QtWidgets.QDialog):
+    def __init__(self, sample, blank, parent: PlotWindow):
+        self.parent = parent
+        super().__init__(self.parent)
+        self.setWindowTitle('Background denoise option')
+        self.sample = sample
+        self.blank = blank
+
+        # 字体设置
+        font = QtGui.QFont()
+        font.setFamily('Arial')
+        font.setBold(True)
+        font.setPixelSize(15)
+        font.setWeight(75)
 
 class ProgressBarsListItem(QtWidgets.QWidget):
     def __init__(self, text, pb=None, parent=None):
