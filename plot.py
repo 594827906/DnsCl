@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
+from df_process_test import construct_df
 import pymzml
 import pyteomics.mzxml as mzxml
 from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
@@ -343,8 +344,10 @@ class ParameterWindow1(QtWidgets.QDialog):
             sample_mdl = mass_def(sample_intensity, lower_mass=lower_mass, upper_mass=upper_mass)
             sample_bin = bin_peaks(sample_mdl)
             sample_pre = check_rep_var(sample_bin)
-            sample_pre.to_csv('sample_pre.csv')
-            self._list_of_process.addFile('sample_pre.csv')
+            # TODO:处理完成，是否绘制TIC/导出CSV
+            # obj_sample = construct_df(sample_pre, label='Sample Processed')
+            # sample_pre.to_csv('sample_pre.csv')
+            # self._list_of_process.addFile('sample_pre.csv')
             # pd.setAutoClose(True)
             print('end')
         except ValueError:
@@ -369,6 +372,7 @@ class ParameterWindow2(QtWidgets.QDialog):
         font.setBold(True)
         font.setPixelSize(15)
         font.setWeight(75)
+
 
 class ProgressBarsListItem(QtWidgets.QWidget):
     def __init__(self, text, pb=None, parent=None):

@@ -6,7 +6,7 @@ from plot import PlotWindow, ParameterWindow1, ParameterWindow2, ProgressBarsLis
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
-from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
+from df_process_test import construct_df
 
 
 class MainWindow(PlotWindow):
@@ -21,7 +21,7 @@ class MainWindow(PlotWindow):
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)  # https://blog.csdn.net/fjunchao/article/details/117551577
         self._list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
-        self._list_of_process.connectRightClick(partial(ProcessListMenu, self))  # 右键打开菜单
+        self._list_of_processed.connectRightClick(partial(ProcessListMenu, self))  # 右键打开菜单
 
     def _create_menu(self):
         # menu = QtWidgets.QMenuBar(self)
@@ -30,10 +30,14 @@ class MainWindow(PlotWindow):
         # file submenu(step1&5):导入文件、每一步处理后的图谱、最终筛选出的mz、rt、intensity（csv?）
         file = menu.addMenu('File')
 
-        # 导入文件
-        file_import = QtWidgets.QAction('Open *.mzXML', self)
-        file_import.triggered.connect(self._open_file)
-        file.addAction(file_import)
+        # 导入mzxml文件
+        mzxml_import = QtWidgets.QAction('Open *.mzXML', self)
+        mzxml_import.triggered.connect(self._open_mzxml)
+        file.addAction(mzxml_import)
+        # 直接导入处理过的文件(csv)
+        csv_import = QtWidgets.QAction('Open processed file (*.csv)', self)
+        csv_import.triggered.connect(self._open_csv)
+        file.addAction(csv_import)
 
         file_export = QtWidgets.QMenu('Save', self)
         # 导出当前图谱为图片
@@ -57,18 +61,13 @@ class MainWindow(PlotWindow):
         file.addMenu(file_export)
         # file.addMenu(file_clear)
 
-        # spectrogram simplification submenu(step2)
-        simplification = menu.addMenu('Simplification')
+        # background subtraction denoise(step2&3)
+        denoise = menu.addMenu('Denoising')
 
-        rep_var = QtWidgets.QAction('Repeatability and Variability', self)
-        rep_var.triggered.connect(self.rep_var)
-        simplification.addAction(rep_var)
         Mass_defect_limit = QtWidgets.QAction('Mass defect limit', self)
         Mass_defect_limit.triggered.connect(self.mass_defect_limit)
-        simplification.addAction(Mass_defect_limit)
+        denoise.addAction(Mass_defect_limit)
 
-        # background subtraction denoise(step3)
-        denoise = menu.addMenu('Denoising')
         background_subtraction_denoise = QtWidgets.QAction("background subtraction denoise", self)
         background_subtraction_denoise.triggered.connect(self.denoise)
         denoise.addAction(background_subtraction_denoise)
@@ -85,14 +84,14 @@ class MainWindow(PlotWindow):
         # 左侧布局
         file_list_label = QtWidgets.QLabel('File list：')
         self._list_of_files = FileListWidget()
-        process_list_label = QtWidgets.QLabel('Process list：')
-        self._list_of_process = FileListWidget()
+        process_list_label = QtWidgets.QLabel('Processed list：')
+        self._list_of_processed = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout()
         layout_left.addWidget(file_list_label)
         layout_left.addWidget(self._list_of_files, 3)
         layout_left.addWidget(process_list_label)
-        layout_left.addWidget(self._list_of_process, 6)
+        layout_left.addWidget(self._list_of_processed, 6)
 
         # 中间布局
         layout_mid = QtWidgets.QHBoxLayout()
@@ -120,10 +119,15 @@ class MainWindow(PlotWindow):
 
         self.setCentralWidget(widget)
 
-    def _open_file(self):
+    def _open_mzxml(self):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML)')[0]
         for name in files_names:
             self._list_of_files.addFile(name)
+
+    def _open_csv(self):
+        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'csv (*.csv)')[0]
+        for name in files_names:
+            self._list_of_processed.addFile(name)
 
     def _export_features(self, mode):
         if self._list_of_files.count() > 0:
@@ -154,38 +158,7 @@ class MainWindow(PlotWindow):
     def clear_btn(self):
         self._list_of_files.clear()
 
-    def rep_var(self):
-        if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
-
-            sample = obtain_MS1(self.sample_plotted_list[0])
-            blank = obtain_MS1(self.blank_plotted_list[0])
-
-            sample_rt = RT_screening(sample, lower_rt=2.5, upper_rt=30.0)
-            blank_rt = RT_screening(blank, lower_rt=2.5, upper_rt=30.0)
-
-            sample_mz = mz_screening(sample_rt, lower_mz=150.0, upper_mz=1000.0)
-            blank_mz = mz_screening(blank_rt, lower_mz=150.0, upper_mz=1000.0)
-
-            sample_intensity = intens_screening(sample_mz, lower_inten=10000)
-            blank_intensity = intens_screening(blank_mz, lower_inten=10000)
-
-            sample_mdl = mass_def(sample_intensity)
-            blank_mdl = mass_def(blank_intensity)
-
-            sample_bin = bin_peaks(sample_mdl)
-            blank_bin = bin_peaks(blank_mdl)
-
-            sample_pre = check_rep_var(sample_bin)
-            blank_pre = check_rep_var(blank_bin)
-
-            print('process finished')
-        else:
-            msg = QtWidgets.QMessageBox(self)
-            msg.setText('You should import 2 files as sample and blank each, first')
-            msg.setIcon(QtWidgets.QMessageBox.Warning)
-            msg.exec_()
-
-    def mass_defect_limit(self):
+    def mass_defect_limit(self):  # step 2
         if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
             sample = self.sample_plotted_list[0]
             blank = self.blank_plotted_list[0]
@@ -197,7 +170,7 @@ class MainWindow(PlotWindow):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def denoise(self):
+    def denoise(self):  # TODO: step 3
         if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
             sample = self.sample_plotted_list[0]
             blank = self.blank_plotted_list[0]
@@ -217,12 +190,12 @@ class ProcessListMenu(QtWidgets.QMenu):
 
         menu = QtWidgets.QMenu(parent)
 
-        csv = QtWidgets.QAction('Save as .csv', parent)
+        sample = QtWidgets.QAction('Plot as Samplw', parent)
         blank = QtWidgets.QAction('Plot as blank', parent)
         clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
-        menu.addAction(csv)
+        menu.addAction(sample)
         menu.addAction(blank)
         menu.addAction(clear)
         menu.addAction(close)
@@ -231,10 +204,13 @@ class ProcessListMenu(QtWidgets.QMenu):
 
         for file in self.parent.get_selected_files():
             file = file.text()
-            if action == csv:
-                sample_pre.to_csv('sample_pre.csv')
+            label = f'{file}'
+            if action == sample:
+                plotted, path = construct_df(file, mode='blank')
+                if plotted:
+                    self.parent.sample_plotted_list.append(path)
             elif action == blank:
-                plotted, path = self.parent.plot_tic(file, mode='blank')
+                plotted, path = construct_df(file, mode='blank')
                 if plotted:
                     self.parent.blank_plotted_list.append(path)
 
