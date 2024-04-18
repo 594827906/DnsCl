@@ -190,7 +190,7 @@ class ProcessListMenu(QtWidgets.QMenu):
 
         menu = QtWidgets.QMenu(parent)
 
-        sample = QtWidgets.QAction('Plot as Samplw', parent)
+        sample = QtWidgets.QAction('Plot as Sample', parent)
         blank = QtWidgets.QAction('Plot as blank', parent)
         clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)

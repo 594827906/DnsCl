@@ -338,17 +338,17 @@ class ParameterWindow1(QtWidgets.QDialog):
             # pd.show()
 
             sample = obtain_MS1(self.sample)
-            blank = obtain_MS1(self.blank)
+            # blank = obtain_MS1(self.blank)
             sample_rt = RT_screening(sample, lower_rt=lower_rt, upper_rt=upper_rt)
             sample_mz = mz_screening(sample_rt, lower_mz=lower_mz, upper_mz=upper_mz)
             sample_intensity = intens_screening(sample_mz, lower_inten=intensity_thd)
             sample_mdl = mass_def(sample_intensity, lower_mass=lower_mass, upper_mass=upper_mass)
             sample_bin = bin_peaks(sample_mdl)
             sample_pre = check_rep_var(sample_bin)
-            # TODO:处理完成，是否绘制TIC/导出CSV
+            # TODO:处理完成，导出CSV并添加到processed_list
             # obj_sample = construct_df(sample_pre, label='Sample Processed')
-            # sample_pre.to_csv('sample_pre.csv')
-            # self._list_of_process.addFile('sample_pre.csv')
+            sample_pre.to_csv('sample_pre.csv')
+            self.parent._list_of_processed.addFile('sample_pre.csv')
             # pd.setAutoClose(True)
             print('end')
         except ValueError:
