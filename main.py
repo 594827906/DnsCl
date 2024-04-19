@@ -7,6 +7,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
 from df_process_test import construct_df
+import matplotlib.pyplot as plt
 
 
 class MainWindow(PlotWindow):
@@ -21,7 +22,7 @@ class MainWindow(PlotWindow):
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)  # https://blog.csdn.net/fjunchao/article/details/117551577
         self._list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
-        self._list_of_processed.connectRightClick(partial(ProcessListMenu, self))  # 右键打开菜单
+        self._list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
 
     def _create_menu(self):
         # menu = QtWidgets.QMenuBar(self)
@@ -182,6 +183,24 @@ class MainWindow(PlotWindow):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
+    def plot_processed(self, item):
+        file = item.text()  # 获取文件名
+        file_path = self._list_of_processed.getPath(item)
+        obj = construct_df(file_path, file)
+        x = obj['x']
+        y = obj['y']
+        label = obj['label']
+
+        fig = plt.figure(dpi=300, figsize=(24, 6))
+        # fig = plt.subplot(111)
+        plt.title('Processed TIC')
+        plt.xlabel('time')
+        plt.ylabel('intensity')
+        plt.plot(x, y, label=label)
+        plt.legend(loc='best')
+        plt.grid(alpha=0.8)
+        fig.show()
+
 
 class ProcessListMenu(QtWidgets.QMenu):
     def __init__(self, parent: MainWindow):
@@ -190,29 +209,13 @@ class ProcessListMenu(QtWidgets.QMenu):
 
         menu = QtWidgets.QMenu(parent)
 
-        sample = QtWidgets.QAction('Plot as Sample', parent)
-        blank = QtWidgets.QAction('Plot as blank', parent)
         clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
-        menu.addAction(sample)
-        menu.addAction(blank)
         menu.addAction(clear)
         menu.addAction(close)
 
         action = menu.exec_(QtGui.QCursor.pos())
-
-        for file in self.parent.get_selected_files():
-            file = file.text()
-            label = f'{file}'
-            if action == sample:
-                plotted, path = construct_df(file, mode='blank')
-                if plotted:
-                    self.parent.sample_plotted_list.append(path)
-            elif action == blank:
-                plotted, path = construct_df(file, mode='blank')
-                if plotted:
-                    self.parent.blank_plotted_list.append(path)
 
         if action == close:
             self.close_files()
