@@ -104,7 +104,7 @@ class MainWindow(PlotWindow):
         scrollable_pb_list = QtWidgets.QScrollArea()
         scrollable_pb_list.setWidget(self._pb_list)
         scrollable_pb_list.setWidgetResizable(True)
-        layout_plot.addWidget(scrollable_pb_list, 1)
+        # layout_plot.addWidget(scrollable_pb_list, 1)
 
         layout_mid.addLayout(layout_plot)
 

@@ -1,3 +1,4 @@
+import functools
 from functools import partial
 from PyQt5 import QtWidgets, QtCore, QtGui
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ from utils.threading import Worker
 from df_process_test import construct_df
 import pymzml
 import pyteomics.mzxml as mzxml
-from preprocess import obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
+from preprocess import defect_process, obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
 import numpy as np
 
 
@@ -144,14 +145,14 @@ class PlotWindow(QtWidgets.QMainWindow):
         plotted = False
         path = self._list_of_files.file2path[file]
         if label not in self._label2line:
-            construct_mzxml(path, label, mode)
-            pb = ProgressBarsListItem(f'Plotting: {file}', parent=self._pb_list)
-            self._pb_list.addItem(pb)
+            # construct_mzxml(path, label, mode)
+            # pb = ProgressBarsListItem(f'Plotting: {file}', parent=self._pb_list)
+            # self._pb_list.addItem(pb)
             worker = Worker(construct_mzxml, path, label, mode)
-            worker.signals.progress.connect(pb.setValue)
+            # worker.signals.progress.connect(pb.setValue)
             worker.signals.result.connect(self.plotter)
-            worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
-
+            # worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
+            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
             self._plotted_list.append(label)
 
@@ -192,6 +193,7 @@ class ParameterWindow1(QtWidgets.QDialog):
         self.setWindowTitle('Mass defect limit option')
         self.sample = sample
         self.blank = blank
+        self._thread_pool = QtCore.QThreadPool()
 
         # 字体设置
         font = QtGui.QFont()
@@ -337,19 +339,25 @@ class ParameterWindow1(QtWidgets.QDialog):
             # pd.setRange(0, 0)
             # pd.show()
 
-            sample = obtain_MS1(self.sample)
+            worker = Worker(defect_process, self.sample, lower_rt, upper_rt, lower_mz, upper_mz,
+                            intensity_thd, lower_mass, upper_mass)
+            # result = worker.get_result()
+            worker.signals.result.connect(self.result_to_csv)
+            # worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
+            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker)
+
+            # sample = obtain_MS1(self.sample)
             # blank = obtain_MS1(self.blank)
-            sample_rt = RT_screening(sample, lower_rt=lower_rt, upper_rt=upper_rt)
-            sample_mz = mz_screening(sample_rt, lower_mz=lower_mz, upper_mz=upper_mz)
-            sample_intensity = intens_screening(sample_mz, lower_inten=intensity_thd)
-            sample_mdl = mass_def(sample_intensity, lower_mass=lower_mass, upper_mass=upper_mass)
-            sample_bin = bin_peaks(sample_mdl)
-            sample_pre = check_rep_var(sample_bin)
+            # sample_rt = RT_screening(sample, lower_rt=lower_rt, upper_rt=upper_rt)
+            # sample_mz = mz_screening(sample_rt, lower_mz=lower_mz, upper_mz=upper_mz)
+            # sample_intensity = intens_screening(sample_mz, lower_inten=intensity_thd)
+            # sample_mdl = mass_def(sample_intensity, lower_mass=lower_mass, upper_mass=upper_mass)
+            # sample_bin = bin_peaks(sample_mdl)
+            # sample_pre = check_rep_var(sample_bin)
             # TODO:处理完成，导出CSV并添加到processed_list
             # obj_sample = construct_df(sample_pre, label='Sample Processed')
-            sample_pre.to_csv('sample_pre.csv')
             self.parent._list_of_processed.addFile('sample_pre.csv')
-            # pd.setAutoClose(True)
             print('end')
         except ValueError:
             # popup window with exception
@@ -358,6 +366,8 @@ class ParameterWindow1(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
+    def result_to_csv(self, df):
+        df.to_csv('sample_pre.csv')
 
 class ParameterWindow2(QtWidgets.QDialog):
     def __init__(self, sample, blank, parent: PlotWindow):
@@ -533,6 +543,7 @@ def construct_mzxml(path, label, mode, progress_callback=None):
     run = mzxml.read(path)
     time = []
     tic = []
+    print(run)
     # spectrum_count = run.get_spectrum_count()
     for i, scan in enumerate(run):
         if scan['msLevel'] == 1:

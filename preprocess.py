@@ -35,24 +35,24 @@ def obtain_MS1(mzXML_file):
     #     spec['num'], ms_level=spec['msLevel'], scan_time=spec['retentionTime']))
         if spec['msLevel'] == 1:   # 一级谱信息
             scan = scan + 1
-            scans.extend(np.tile(scan,len(spec['m/z array'])))  # 记录谱图id
+            scans.extend(np.tile(scan, len(spec['m/z array'])))  # 记录谱图id
             RT.extend(np.tile(spec['retentionTime'],len(spec['m/z array'])))   # 记录保留时间
             intensity.extend(spec['intensity array'])           # 离子强度
             mz.extend(spec['m/z array'])                # 质量数
  
     # 构造dataframe数组
     output = pd.DataFrame({
-        'scan':scans,
-        'RT':RT,
-        'intensity':intensity,
-        'mz':mz
+        'scan': scans,
+        'RT': RT,
+        'intensity': intensity,
+        'mz': mz
     })
     print("Parsed MS1 spectra from file {0}".format(mzXML_file))
     return output
 
 
 ##------------RT screening----------#
-def RT_screening(input_df,lower_rt,upper_rt):
+def RT_screening(input_df, lower_rt, upper_rt):
     # 设置RT筛选条件
     condition = (input_df['RT'] >= lower_rt) & (input_df['RT'] <= upper_rt)
     filtered_df = input_df[condition]
@@ -89,8 +89,8 @@ def mass_def(input_df, lower_mass = 600, upper_mass=1000):
 
 #---------repeatability and variability-----------#
 ## ----------binning first------##
-def bin_peaks(input_df,tol=10e-6):
-    data = input_df.sort_values(by='mz') # 排序
+def bin_peaks(input_df, tol=10e-6):
+    data = input_df.sort_values(by='mz')  # 排序
     RT = np.array(data['RT'])
     mass = np.array(data['mz'])
     intensity = np.array(data['intensity'])
@@ -141,10 +141,10 @@ def bin_peaks(input_df,tol=10e-6):
             mass[(gap_idx + 1):(right + 1)] = r_mean_mass
     
     output = pd.DataFrame({
-        'scan':scan,
-        'RT':RT,
-        'intensity':intensity,
-        'mz':mass
+        'scan': scan,
+        'RT': RT,
+        'intensity': intensity,
+        'mz': mass
     })
     return output
 
@@ -156,19 +156,19 @@ def check_rep_var(input_df, n_scans=10, rep_ratio=0.7, var_ratio=0.1):
     merge_df = pd.DataFrame()
     for name, group in grouped_data:
         # each name is a bin of mass, each group is a dataframe of a bin
-        data = group.sort_values(by='scan') # 对scan排序
+        data = group.sort_values(by='scan')  # 对scan排序
         intensity = np.array(data['intensity'])
         scan = np.array(data['scan'])
         # if this mass existed beyond 70% of n_scans
         if len(scan) > n_scans:
             d_scan = np.diff(scan)
-            one_locations = np.where(d_scan==1)[0]
+            one_locations = np.where(d_scan == 1)[0]
             consecutive_lengths = np.split(one_locations, np.where(np.diff(one_locations) != 1)[0]+1)
             length_one = [len(length) for length in consecutive_lengths]
             if np.any(np.array(length_one) >= n_scans * rep_ratio) & ((max(intensity)-min(intensity))/min(intensity) > var_ratio):
                 print('mz', name)
                 print(data.head(3))
-                merge_df =  pd.concat([merge_df, data], axis=0)
+                merge_df = pd.concat([merge_df, data], axis=0)
     return merge_df
 
 
@@ -224,6 +224,12 @@ def check_rep_var(input_df, n_scans=10, rep_ratio=0.7, var_ratio=0.1):
 # sample_pre = preprocess(sample)
 # blank_pre = preprocess(blank)
 
-
-
-
+def defect_process(file, lower_rt, upper_rt, lower_mz, upper_mz, intensity_thd, lower_mass, upper_mass):
+    df = obtain_MS1(file)
+    df = RT_screening(df, lower_rt=lower_rt, upper_rt=upper_rt)
+    df = mz_screening(df, lower_mz=lower_mz, upper_mz=upper_mz)
+    df = intens_screening(df, lower_inten=intensity_thd)
+    df = mass_def(df, lower_mass=lower_mass, upper_mass=upper_mass)
+    df = bin_peaks(df)
+    df = check_rep_var(df)
+    return df
