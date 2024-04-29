@@ -1,8 +1,6 @@
 import sys
 import os
 from plot import PlotWindow, ParameterWindow1, ParameterWindow2, ProgressBarsListItem
-# from utils.show_list import find_mzML, PeakListWidget, ROIListWidget, ProgressBarsListItem
-# from utils.annotation_window import AnnotationParameterWindow, ReAnnotationParameterWindow
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
@@ -20,9 +18,10 @@ class MainWindow(PlotWindow):
         self.setStyleSheet(style_sheet)
         self.show()
 
-        # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)  # https://blog.csdn.net/fjunchao/article/details/117551577
-        self._list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
-        self._list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
+        # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
+        self.list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
+        self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
 
     def _create_menu(self):
         # menu = QtWidgets.QMenuBar(self)
@@ -84,15 +83,15 @@ class MainWindow(PlotWindow):
 
         # 左侧布局
         file_list_label = QtWidgets.QLabel('File list：')
-        self._list_of_files = FileListWidget()
+        self.list_of_files = FileListWidget()
         process_list_label = QtWidgets.QLabel('Processed list：')
-        self._list_of_processed = FileListWidget()
+        self.list_of_processed = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout()
         layout_left.addWidget(file_list_label)
-        layout_left.addWidget(self._list_of_files, 3)
+        layout_left.addWidget(self.list_of_files, 3)
         layout_left.addWidget(process_list_label)
-        layout_left.addWidget(self._list_of_processed, 6)
+        layout_left.addWidget(self.list_of_processed, 6)
 
         # 中间布局
         layout_mid = QtWidgets.QHBoxLayout()
@@ -123,15 +122,15 @@ class MainWindow(PlotWindow):
     def _open_mzxml(self):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML)')[0]
         for name in files_names:
-            self._list_of_files.addFile(name)
+            self.list_of_files.addFile(name)
 
     def _open_csv(self):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'csv (*.csv)')[0]
         for name in files_names:
-            self._list_of_processed.addFile(name)
+            self.list_of_processed.addFile(name)
 
     def _export_features(self, mode):
-        if self._list_of_files.count() > 0:
+        if self.list_of_files.count() > 0:
             if mode == 'csv':
                 # to do: features should be QTreeWidget (root should keep basic information: files and parameters)
                 files = self._feature_parameters['files']
@@ -155,9 +154,6 @@ class MainWindow(PlotWindow):
             msg.setText('Something is wrong')
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
-
-    def clear_btn(self):
-        self._list_of_files.clear()
 
     def mass_defect_limit(self):  # step 2
         if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
@@ -185,7 +181,7 @@ class MainWindow(PlotWindow):
 
     def plot_processed(self, item):
         file = item.text()  # 获取文件名
-        file_path = self._list_of_processed.getPath(item)
+        file_path = self.list_of_processed.getPath(item)
         obj = construct_df(file_path, file)
         x = obj['x']
         y = obj['y']
@@ -202,34 +198,28 @@ class MainWindow(PlotWindow):
         fig.show()
 
 
-class ProcessListMenu(QtWidgets.QMenu):
+class ProcessedListMenu(QtWidgets.QMenu):
     def __init__(self, parent: MainWindow):
         self.parent = parent
         super().__init__(parent)
 
         menu = QtWidgets.QMenu(parent)
 
-        clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
-        menu.addAction(clear)
         menu.addAction(close)
 
         action = menu.exec_(QtGui.QCursor.pos())
 
         if action == close:
             self.close_files()
-        elif action == clear:
-            self.delete_tic()
-
-    def delete_tic(self):  # TODO:暂时只能全部清空，能否选中清除
-        for item in self.parent.get_selected_files():
-            self.parent.delete_line(item.text())
-        self.parent.refresh_canvas()
 
     def close_files(self):
-        for item in self.parent.get_selected_files():
-            self.parent.close_file(item)
+        for item in self.get_selected_files():
+            self.parent.list_of_processed.deleteFile(item)
+
+    def get_selected_files(self):
+        return self.parent.list_of_processed.selectedItems()
 
 
 class FileListMenu(QtWidgets.QMenu):
@@ -251,7 +241,7 @@ class FileListMenu(QtWidgets.QMenu):
 
         action = menu.exec_(QtGui.QCursor.pos())
 
-        for file in self.parent.get_selected_files():
+        for file in self.get_selected_files():
             file = file.text()
             if action == sample:
                 plotted, path = self.parent.plot_tic(file, mode='sample')
@@ -268,13 +258,16 @@ class FileListMenu(QtWidgets.QMenu):
             self.delete_tic()
 
     def delete_tic(self):  # TODO:暂时只能全部清空，能否选中清除
-        for item in self.parent.get_selected_files():
+        for item in self.get_selected_files():
             self.parent.delete_line(item.text())
         self.parent.refresh_canvas()
 
     def close_files(self):
-        for item in self.parent.get_selected_files():
-            self.parent.close_file(item)
+        for item in self.get_selected_files():
+            self.parent.list_of_files.deleteFile(item)
+
+    def get_selected_files(self):
+        return self.parent.list_of_files.selectedItems()
 
 
 class ClickableListWidget(QtWidgets.QListWidget):
@@ -326,11 +319,20 @@ class FileListWidget(ClickableListWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.file2path = {}
+        self.open_files = set()
 
     def addFile(self, path: str):
         filename = os.path.basename(path)
-        self.file2path[filename] = path
-        self.addItem(filename)
+        if filename not in self.open_files:  # 避免在列表中重复添加文件
+            self.file2path[filename] = path
+            self.addItem(filename)
+            self.open_files.add(filename)
+        else:
+            msg = QtWidgets.QMessageBox()
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.setText("File already open!")
+            msg.setWindowTitle("Warning")
+            msg.exec_()
 
     def deleteFile(self, item: QtWidgets.QListWidgetItem):
         del self.file2path[item.text()]

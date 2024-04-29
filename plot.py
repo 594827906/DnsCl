@@ -115,12 +115,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         # self._figure.canvas.mpl_connect('button_press_event', self.button_press)  # 右键清空画布
         self._canvas.draw()
 
-    def close_file(self, item):
-        self._list_of_files.deleteFile(item)
-
-    def get_selected_files(self):
-        return self._list_of_files.selectedItems()
-
     def get_selected_features(self):
         return self._list_of_features.selectedItems()
 

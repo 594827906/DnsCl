@@ -166,8 +166,8 @@ def check_rep_var(input_df, n_scans=10, rep_ratio=0.7, var_ratio=0.1):
             consecutive_lengths = np.split(one_locations, np.where(np.diff(one_locations) != 1)[0]+1)
             length_one = [len(length) for length in consecutive_lengths]
             if np.any(np.array(length_one) >= n_scans * rep_ratio) & ((max(intensity)-min(intensity))/min(intensity) > var_ratio):
-                print('mz', name)
-                print(data.head(3))
+                # print('mz', name)
+                # print(data.head(3))
                 merge_df = pd.concat([merge_df, data], axis=0)
     return merge_df
 
