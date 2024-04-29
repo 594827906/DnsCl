@@ -21,7 +21,7 @@ class MainWindow(PlotWindow):
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
         self.list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
-        self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
+        # self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
 
     def _create_menu(self):
         # menu = QtWidgets.QMenuBar(self)
@@ -164,6 +164,7 @@ class MainWindow(PlotWindow):
         else:
             msg = QtWidgets.QMessageBox(self)
             msg.setText('You should import 2 files as sample and blank each, first')
+            msg.setWindowTitle("Warning")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
@@ -176,6 +177,7 @@ class MainWindow(PlotWindow):
         else:
             msg = QtWidgets.QMessageBox(self)
             msg.setText('You should import 2 files as sample and blank each, first')
+            msg.setWindowTitle("Warning")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
@@ -202,17 +204,30 @@ class ProcessedListMenu(QtWidgets.QMenu):
     def __init__(self, parent: MainWindow):
         self.parent = parent
         super().__init__(parent)
+        self._thread_pool = QtCore.QThreadPool()
 
         menu = QtWidgets.QMenu(parent)
 
+        plot = QtWidgets.QAction('show TIC', parent)
         close = QtWidgets.QAction('Close', parent)
 
+        menu.addAction(plot)
         menu.addAction(close)
 
         action = menu.exec_(QtGui.QCursor.pos())
 
-        if action == close:
+        if action == plot:
+            self.plot()
+        elif action == close:
             self.close_files()
+
+    def plot(self):
+        for item in self.get_selected_files():
+            worker = Worker('Plotting TIC from csv ...', self.parent.plot_processed, item)
+            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker)
+
+            # self.parent.plot_processed(item)
 
     def close_files(self):
         for item in self.get_selected_files():

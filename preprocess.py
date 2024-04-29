@@ -1,24 +1,10 @@
 #!/usr/bin/python
 # -*- coding: gbk -*-
 
-import os
-import glob
 import pandas as pd
 import numpy as np
 import pyteomics.mzxml as mzxml
 
-# file_path = r'C:\坚果云\02-研究课题\0000-CODE\Python\myproject\DnsCl设计\软件设计数据验证-20240403'
-# file_path = r'C:\John\DnsCl\软件设计数据验证-20240403'
-# mzXML_list=glob.glob(os.path.join(file_path,'*.mzXML'))
-
-# run = mzxml.read(mzXML_list[0])
-# spect1=next(run)  # 查看第一个质谱
-# print(spect1.keys()) # 查看一个质谱中的信息
-# print(spect1['num'])
-# print(spect1['m/z array'])
-# print(spect1['intensity array'])
-# print(spect1['totIonCurrent'])
-#
 
 ##-----------output MS1 spectra--------------#
 def obtain_MS1(mzXML_file):
@@ -171,58 +157,6 @@ def check_rep_var(input_df, n_scans=10, rep_ratio=0.7, var_ratio=0.1):
                 merge_df = pd.concat([merge_df, data], axis=0)
     return merge_df
 
-
-##-------------import ----------------#
-# blank = obtain_MS1(mzXML_list[0])
-# sample = obtain_MS1(mzXML_list[2])
-#
-# #step-1: rt
-# print("Start to RT screening...")
-# sample_rt = RT_screening(sample,lower_rt=2.5,upper_rt=30.0)
-# blank_rt = RT_screening(blank,lower_rt=2.5,upper_rt=30.0)
-#
-# #step-2: mz
-# print(" mass screening...")
-# sample_mz = mz_screening(sample_rt,lower_mz=150.0,upper_mz=1000.0)
-# blank_mz = mz_screening(blank_rt,lower_mz=150.0,upper_mz=1000.0)
-#
-# # step-3: intensity
-# print("set the intensity threshold...")
-# sample_intensity = intens_screening(sample_mz, lower_inten=10000)
-# blank_intensity = intens_screening(blank_mz,lower_inten=10000)
-#
-# # step-4: mass defect limit
-# print('perform mass defect limit....')
-# sample_mdl = mass_def(sample_intensity)
-# blank_mdl = mass_def(blank_intensity)
-#
-# # step-5: binning
-# print('mass binning.....')
-# sample_bin = bin_peaks(sample_mdl)
-# blank_bin = bin_peaks(blank_mdl)
-#
-# # step-6: repeatability and variability checking
-# print('check the repeatability and variablity....')
-# sample_pre = check_rep_var(sample_bin)
-# blank_pre = check_rep_var(blank_bin)
-#
-# sample_pre.to_csv('sample_pre.csv')
-# blank_pre.to_csv('blank_pre.csv')
-#
-# print('Preprocess completed!')
-# def preprocess(input):
-#     # input file should be a DataFrame
-#     s1 = RT_screening(input, lower_rt=2.5, upper_rt=30.0)
-#     s2 = mz_screening(s1, lower_mz=150.0, upper_mz=1000.0)
-#     s3 = intens_screening(s2, lower_inten=10000)
-#     s4 = mass_def(s3)
-#     s5 = bin_peaks(s4)
-#     s6 = check_rep_var(s5)
-
-#     return s6
-
-# sample_pre = preprocess(sample)
-# blank_pre = preprocess(blank)
 
 def defect_process(file, lower_rt, upper_rt, lower_mz, upper_mz, intensity_thd, lower_mass, upper_mass):
     df = obtain_MS1(file)

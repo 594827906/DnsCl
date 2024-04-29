@@ -51,16 +51,17 @@ class Worker(QtCore.QRunnable):
         minimum peak length in points
 
     """
-    def __init__(self, function, *args, multiple_process=False, **kwargs):
+    def __init__(self, mode, function, *args, multiple_process=False, **kwargs):
         super(Worker, self).__init__()
 
         self.function = function
         self.args = args
         self.kwargs = kwargs
         self.signals = WorkerSignals()
+        self.mode = mode
         self.progress_dialog = QtWidgets.QProgressDialog()
         self.progress_dialog.setRange(0, 0)  # 设置进度条范围为0到0，表示一个不确定的进度条
-        self.progress_dialog.setLabelText("Processing...")  # 设置进度条文本
+        self.progress_dialog.setLabelText(self.mode)  # 设置进度条文本
         self.progress_dialog.show()
 
         # Add the callback to our kwargs

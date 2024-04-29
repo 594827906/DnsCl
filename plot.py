@@ -35,15 +35,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._canvas = FigureCanvas(self._figure)
         self._toolbar = NavigationToolbar(self._canvas, self)
 
-    # def run_thread(self, caption: str, worker: Worker, text=None, icon=None):
-    #     # pb = ProgressBarsListItem(caption, parent=self._pb_list)
-    #     self._pb_list.addItem(pb)
-    #     worker.signals.progress.connect(pb.setValue)
-    #     worker.signals.operation.connect(pb.setLabel)
-    #     worker.signals.finished.connect(partial(self._threads_finisher,
-    #                                             text=text, icon=icon, pb=pb))
-    #     self._thread_pool.start(worker)
-
     def _threads_finisher(self, text=None, icon=None, pb=None):
         if pb is not None:
             self._pb_list.removeItem(pb)
@@ -71,20 +62,6 @@ class PlotWindow(QtWidgets.QMainWindow):
     #         event.inaxes.set(xlim=(x_min - x_range, x_max + x_range))
     #         print('down')
     #     self._canvas.draw_idle()
-
-    # def button_press(self, event):  # 右键清空画布
-    #     if event.button == 1:
-    #         print('1')
-    #     if event.button == 2:
-    #         print('2')
-    #     if event.button == 3:
-    #         print('3')
-    #         print(self._plotted_list, 'event in')
-    #         self.fig_sample.cla()
-    #         self._label2line.clear()
-    #         self._plotted_list.clear()
-    #         print(self._plotted_list, 'event end')
-    #         self._canvas.draw_idle()
 
     def plotter(self, obj):
         # if not self._label2line:  # in case if 'feature' was plotted
@@ -137,15 +114,10 @@ class PlotWindow(QtWidgets.QMainWindow):
     def plot_tic(self, file, mode):
         label = f'{file}'
         plotted = False
-        path = self._list_of_files.file2path[file]
+        path = self.list_of_files.file2path[file]
         if label not in self._label2line:
-            # construct_mzxml(path, label, mode)
-            # pb = ProgressBarsListItem(f'Plotting: {file}', parent=self._pb_list)
-            # self._pb_list.addItem(pb)
-            worker = Worker(construct_mzxml, path, label, mode)
-            # worker.signals.progress.connect(pb.setValue)
+            worker = Worker('plotting TIC...', construct_mzxml, path, label, mode)
             worker.signals.result.connect(self.plotter)
-            # worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
             self._plotted_list.append(label)
@@ -333,25 +305,20 @@ class ParameterWindow1(QtWidgets.QDialog):
             # pd.setRange(0, 0)
             # pd.show()
 
-            worker = Worker(defect_process, self.sample, lower_rt, upper_rt, lower_mz, upper_mz,
-                            intensity_thd, lower_mass, upper_mass)
-            # result = worker.get_result()
-            worker.signals.result.connect(self.result_to_csv)
-            # worker.signals.finished.connect(partial(self._threads_finisher, pb=pb))
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            self._thread_pool.start(worker)
+            worker1 = Worker('processing sample...', defect_process, self.sample, lower_rt, upper_rt,
+                             lower_mz, upper_mz, intensity_thd, lower_mass, upper_mass)
+            worker1.signals.result.connect(partial(self.result_to_csv, 'sample_pre.csv'))
+            worker1.signals.close_signal.connect(worker1.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker1)
 
-            # sample = obtain_MS1(self.sample)
-            # blank = obtain_MS1(self.blank)
-            # sample_rt = RT_screening(sample, lower_rt=lower_rt, upper_rt=upper_rt)
-            # sample_mz = mz_screening(sample_rt, lower_mz=lower_mz, upper_mz=upper_mz)
-            # sample_intensity = intens_screening(sample_mz, lower_inten=intensity_thd)
-            # sample_mdl = mass_def(sample_intensity, lower_mass=lower_mass, upper_mass=upper_mass)
-            # sample_bin = bin_peaks(sample_mdl)
-            # sample_pre = check_rep_var(sample_bin)
+            worker2 = Worker('processing blank...', defect_process, self.blank, lower_rt, upper_rt,
+                             lower_mz, upper_mz, intensity_thd, lower_mass, upper_mass)
+            worker2.signals.result.connect(partial(self.result_to_csv, 'blank_pre.csv'))
+            worker2.signals.close_signal.connect(worker2.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker2)
+
             # TODO:处理完成，导出CSV并添加到processed_list
             # obj_sample = construct_df(sample_pre, label='Sample Processed')
-            self.parent._list_of_processed.addFile('sample_pre.csv')
             print('end')
         except ValueError:
             # popup window with exception
@@ -360,8 +327,10 @@ class ParameterWindow1(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def result_to_csv(self, df):
-        df.to_csv('sample_pre.csv')
+    def result_to_csv(self, name, df):
+        df.to_csv(name)
+        self.parent.list_of_processed.addFile(name)
+
 
 class ParameterWindow2(QtWidgets.QDialog):
     def __init__(self, sample, blank, parent: PlotWindow):
@@ -537,13 +506,9 @@ def construct_mzxml(path, label, mode, progress_callback=None):
     run = mzxml.read(path)
     time = []
     tic = []
-    print(run)
-    # spectrum_count = run.get_spectrum_count()
     for i, scan in enumerate(run):
         if scan['msLevel'] == 1:
             tic.append(scan['totIonCurrent'])  # get total ion of scan
             t = scan['retentionTime']  # get scan time
             time.append(t)
-            # if progress_callback is not None and not i % 10:
-            #     progress_callback.emit(int(i * 100 / spectrum_count))
     return {'x': time, 'y': tic, 'label': label, 'mode': mode}
