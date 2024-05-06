@@ -352,6 +352,7 @@ class FileListWidget(ClickableListWidget):
     def deleteFile(self, item: QtWidgets.QListWidgetItem):
         del self.file2path[item.text()]
         self.takeItem(self.row(item))
+        self.open_files.remove(item.text())
 
     def getPath(self, item: QtWidgets.QListWidgetItem):
         return self.file2path[item.text()]
