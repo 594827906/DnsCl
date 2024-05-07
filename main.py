@@ -19,7 +19,8 @@ class MainWindow(PlotWindow):
         self.show()
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.list_of_files.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
+        self.blank_file.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
+        self.sample_file.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
         self.list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
         # self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
 
@@ -31,9 +32,12 @@ class MainWindow(PlotWindow):
         file = menu.addMenu('File')
 
         # 导入mzxml文件
-        mzxml_import = QtWidgets.QAction('Open *.mzXML', self)
-        mzxml_import.triggered.connect(self._open_mzxml)
-        file.addAction(mzxml_import)
+        blank_mzxml_import = QtWidgets.QAction('Open *.mzXML as blank', self)
+        blank_mzxml_import.triggered.connect(partial(self._open_mzxml, 'blank'))
+        file.addAction(blank_mzxml_import)
+        sample_mzxml_import = QtWidgets.QAction('Open *.mzXML as sample', self)
+        sample_mzxml_import.triggered.connect(partial(self._open_mzxml, 'sample'))
+        file.addAction(sample_mzxml_import)
         # 直接导入处理过的文件(csv)
         csv_import = QtWidgets.QAction('Open processed file (*.csv)', self)
         csv_import.triggered.connect(self._open_csv)
@@ -82,14 +86,18 @@ class MainWindow(PlotWindow):
         self.setWindowTitle('DnsCl')
 
         # 左侧布局
-        file_list_label = QtWidgets.QLabel('File list：')
-        self.list_of_files = FileListWidget()
+        blank_label = QtWidgets.QLabel('Blank list：')
+        self.blank_file = FileListWidget()
+        sample_label = QtWidgets.QLabel('Sample list：')
+        self.sample_file = FileListWidget()
         process_list_label = QtWidgets.QLabel('Processed list：')
         self.list_of_processed = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout()
-        layout_left.addWidget(file_list_label)
-        layout_left.addWidget(self.list_of_files, 3)
+        layout_left.addWidget(blank_label)
+        layout_left.addWidget(self.blank_file, 2)
+        layout_left.addWidget(sample_label)
+        layout_left.addWidget(self.sample_file, 2)
         layout_left.addWidget(process_list_label)
         layout_left.addWidget(self.list_of_processed, 6)
 
@@ -119,10 +127,21 @@ class MainWindow(PlotWindow):
 
         self.setCentralWidget(widget)
 
-    def _open_mzxml(self):
-        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML)')[0]
-        for name in files_names:
-            self.list_of_files.addFile(name)
+    def _open_mzxml(self, mode):
+        if mode == 'blank':
+            path = QtWidgets.QFileDialog.getOpenFileName(None, 'select a file as blank', '', 'mzXML (*.mzXML)')[0]
+            file_name = os.path.basename(path)
+            self.blank_file.addFile(file_name)
+            plotted, path = self.plot_tic(path, mode='blank')
+            if plotted:
+                self.blank_plotted_list.append(path)
+        elif mode == 'sample':
+            path = QtWidgets.QFileDialog.getOpenFileName(None, 'select a file as sample', '', 'mzXML (*.mzXML)')[0]
+            file_name = os.path.basename(path)
+            self.sample_file.addFile(file_name)
+            plotted, path = self.plot_tic(path, mode='sample')
+            if plotted:
+                self.sample_plotted_list.append(path)
 
     def _open_csv(self):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'csv (*.csv)')[0]
@@ -130,7 +149,7 @@ class MainWindow(PlotWindow):
             self.list_of_processed.addFile(name)
 
     def _export_features(self, mode):
-        if self.list_of_files.count() > 0:
+        if self.blank_file.count() > 0:
             if mode == 'csv':
                 # to do: features should be QTreeWidget (root should keep basic information: files and parameters)
                 files = self._feature_parameters['files']
@@ -277,12 +296,12 @@ class FileListMenu(QtWidgets.QMenu):
             self.parent.delete_line(item.text())
         self.parent.refresh_canvas()
 
-    def close_files(self):
+    def close_files(self):  # TODO: 将sample和blank的list管理分开
         for item in self.get_selected_files():
-            self.parent.list_of_files.deleteFile(item)
+            self.parent.blank_file.deleteFile(item)
 
     def get_selected_files(self):
-        return self.parent.list_of_files.selectedItems()
+        return self.parent.blank_file.selectedItems()
 
 
 class ClickableListWidget(QtWidgets.QListWidget):

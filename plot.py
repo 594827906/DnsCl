@@ -10,6 +10,7 @@ import pymzml
 import pyteomics.mzxml as mzxml
 from preprocess import defect_process, obtain_MS1, RT_screening, mz_screening, intens_screening, mass_def, bin_peaks, check_rep_var
 import numpy as np
+import os
 
 
 class PlotWindow(QtWidgets.QMainWindow):
@@ -25,11 +26,11 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._feature_parameters = None
 
         self._figure = plt.figure()
-        self.fig_sample = self._figure.add_subplot(211)  # plot sample
-        self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
-        self.fig_blank = self._figure.add_subplot(212)  # plot blank
+        self.fig_blank = self._figure.add_subplot(211)  # plot sample
         self.fig_blank.ticklabel_format(axis='y', scilimits=(0, 0))
-        self.fig_blank.set_xlabel('Retention time [min]')
+        self.fig_sample = self._figure.add_subplot(212)  # plot blank
+        self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
+        self.fig_sample.set_xlabel('Retention time [min]')
         self._figure.tight_layout()
         self._label2line = dict()  # a label (aka line name) to plotted line
         self._canvas = FigureCanvas(self._figure)
@@ -65,26 +66,26 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def plotter(self, obj):
         # if not self._label2line:  # in case if 'feature' was plotted
-        if obj['mode'] == 'sample':
-            self._figure.delaxes(self.fig_sample)
-            self.fig_sample = self._figure.add_subplot(211)
-            self.fig_sample.set_title('Sample')
-            # self.fig_sample.set_xlabel('Retention time [min]')
-            self.fig_sample.set_ylabel('Intensity')
-            self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
-            line = self.fig_sample.plot(obj['x'], obj['y'], label=obj['label'])
-            self.fig_sample.legend(loc='best')
-            self.fig_sample.grid(alpha=0.8)
         if obj['mode'] == 'blank':
             self._figure.delaxes(self.fig_blank)
-            self.fig_blank = self._figure.add_subplot(212)
+            self.fig_blank = self._figure.add_subplot(211)
             self.fig_blank.set_title('Blank')
-            self.fig_blank.set_xlabel('Retention time [min]')
+            # self.fig_blank.set_xlabel('Retention time [min]')
             self.fig_blank.set_ylabel('Intensity')
             self.fig_blank.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
             line = self.fig_blank.plot(obj['x'], obj['y'], label=obj['label'])
             self.fig_blank.legend(loc='best')
             self.fig_blank.grid(alpha=0.8)
+        if obj['mode'] == 'sample':
+            self._figure.delaxes(self.fig_sample)
+            self.fig_sample = self._figure.add_subplot(212)
+            self.fig_sample.set_title('Sample')
+            self.fig_sample.set_xlabel('Retention time [min]')
+            self.fig_sample.set_ylabel('Intensity')
+            self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
+            line = self.fig_sample.plot(obj['x'], obj['y'], label=obj['label'])
+            self.fig_sample.legend(loc='best')
+            self.fig_sample.grid(alpha=0.8)
 
         self._label2line[obj['label']] = line[0]  # save line
         self._figure.tight_layout()
@@ -111,10 +112,14 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._figure.tight_layout()
         self._canvas.draw()  # refresh canvas
 
-    def plot_tic(self, file, mode):
-        label = f'{file}'
+    def plot_tic(self, path, mode):
+        filename = os.path.basename(path)
+        label = f'{filename}'
         plotted = False
-        path = self.list_of_files.file2path[file]
+        # if mode == 'blank':
+        #     path = self.blank_file.file2path[file]
+        # elif mode == 'sample':
+        #     path = self.sample_file.file2path[file]
         if label not in self._label2line:
             worker = Worker('plotting TIC...', construct_mzxml, path, label, mode)
             worker.signals.result.connect(self.plotter)
@@ -123,7 +128,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plotted_list.append(label)
 
             plotted = True
-        return plotted, path
+        return plotted, filename
 
     def delete_line(self, label):
         self.fig_sample.cla()
@@ -133,22 +138,22 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def refresh_canvas(self):
         if self._label2line:
-            self.fig_sample.legend(loc='best')
-            self.fig_sample.relim()  # recompute the ax.dataLim
-            self.fig_sample.autoscale_view()  # update ax.viewLim using the new dataLim
             self.fig_blank.legend(loc='best')
             self.fig_blank.relim()  # recompute the ax.dataLim
             self.fig_blank.autoscale_view()  # update ax.viewLim using the new dataLim
+            self.fig_sample.legend(loc='best')
+            self.fig_sample.relim()  # recompute the ax.dataLim
+            self.fig_sample.autoscale_view()  # update ax.viewLim using the new dataLim
         else:
             self._figure.clear()
-            self.fig_sample = self._figure.add_subplot(211)
-            self.fig_sample.set_xlabel('Retention time [min]')
-            # self.fig_sample.set_ylabel('Intensity')
-            self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
-            self.fig_blank = self._figure.add_subplot(212)
+            self.fig_blank = self._figure.add_subplot(211)
             self.fig_blank.set_xlabel('Retention time [min]')
             # self.fig_blank.set_ylabel('Intensity')
             self.fig_blank.ticklabel_format(axis='y', scilimits=(0, 0))
+            self.fig_sample = self._figure.add_subplot(212)
+            self.fig_sample.set_xlabel('Retention time [min]')
+            # self.fig_sample.set_ylabel('Intensity')
+            self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
         self._canvas.draw()
 
 
