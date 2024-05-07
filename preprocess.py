@@ -7,7 +7,7 @@ import pyteomics.mzxml as mzxml
 import math
 
 
-##-----------output MS1 spectra--------------#
+# -----------output MS1 spectra-------------- #
 def obtain_MS1(mzXML_file):
     run = mzxml.read(mzXML_file)
     RT = []
@@ -17,16 +17,16 @@ def obtain_MS1(mzXML_file):
     scan = 0
 
     # 读一级谱，output RT, intensity, scans
-    for spec in run:       
-    # print("Spectrum {0}, MS level {ms_level} @ RT {scan_time:1.2f}".format(
-    #     spec['num'], ms_level=spec['msLevel'], scan_time=spec['retentionTime']))
-        if spec['msLevel'] == 1:   # 一级谱信息
+    for spec in run:
+        # print("Spectrum {0}, MS level {ms_level} @ RT {scan_time:1.2f}".format(
+        #     spec['num'], ms_level=spec['msLevel'], scan_time=spec['retentionTime']))
+        if spec['msLevel'] == 1:  # 一级谱信息
             scan = scan + 1
             scans.extend(np.tile(scan, len(spec['m/z array'])))  # 记录谱图id
-            RT.extend(np.tile(spec['retentionTime'], len(spec['m/z array'])))   # 记录保留时间
-            intensity.extend(spec['intensity array'])           # 离子强度
-            mz.extend(spec['m/z array'])                # 质量数
- 
+            RT.extend(np.tile(spec['retentionTime'], len(spec['m/z array'])))  # 记录保留时间
+            intensity.extend(spec['intensity array'])  # 离子强度
+            mz.extend(spec['m/z array'])  # 质量数
+
     # 构造dataframe数组
     output = pd.DataFrame({
         'scan': scans,
@@ -38,7 +38,7 @@ def obtain_MS1(mzXML_file):
     return output
 
 
-##------------RT screening----------#
+# ------------RT screening---------- #
 def RT_screening(input_df, lower_rt, upper_rt):
     # 设置RT筛选条件
     condition = (input_df['RT'] >= lower_rt) & (input_df['RT'] <= upper_rt)
@@ -47,8 +47,8 @@ def RT_screening(input_df, lower_rt, upper_rt):
     return df
 
 
-##------------mz screening---------------#
-def mz_screening(input_df,lower_mz,upper_mz):
+# ------------mz screening--------------- #
+def mz_screening(input_df, lower_mz, upper_mz):
     # 设置mz筛选条件
     condition = (input_df['mz'] >= lower_mz) & (input_df['mz'] <= upper_mz)
     filtered_df = input_df[condition]
@@ -56,7 +56,7 @@ def mz_screening(input_df,lower_mz,upper_mz):
     return df
 
 
-##-----------intensity screening----------#
+# -----------intensity screening---------- #
 def intens_screening(input_df, lower_inten):
     # 设置mz筛选条件
     condition = input_df['intensity'] >= lower_inten
@@ -66,19 +66,19 @@ def intens_screening(input_df, lower_inten):
     return df
 
 
-##-------------mass defect limit ---------#
-def mass_def(input_df, lower_mass = 600, upper_mass=1000):
+# -------------mass defect limit --------- #
+def mass_def(input_df, lower_mass=600, upper_mass=1000):
     # 设置mass defect 筛选条件
     condition = ((input_df['mz'] * 1000) % 1000 >= lower_mass) & ((input_df['mz'] * 1000) % 1000 < upper_mass)
-    
+
     indexes_to_drop = input_df[condition].index
     filtered_df = input_df.drop(indexes_to_drop)
     df = filtered_df.reset_index(drop=True)
     return df
 
 
-#---------repeatability and variability-----------#
-## ----------binning first------##
+# ---------repeatability and variability----------- #
+# ----------binning first------ #
 def bin_peaks(input_df, tol=10e-6):
     data = input_df.sort_values(by='mz')  # 排序
     RT = np.array(data['RT'])
@@ -94,7 +94,7 @@ def bin_peaks(input_df, tol=10e-6):
 
     # Initialization
     n_boundaries = max(1000, np.floor(3 * np.log(n)))
-    boundary_left = [0] * int(n_boundaries) 
+    boundary_left = [0] * int(n_boundaries)
     boundary_right = [0] * int(n_boundaries)
     current_boundary = 0
     boundary_left[current_boundary] = 0
@@ -109,18 +109,18 @@ def bin_peaks(input_df, tol=10e-6):
         gap_idx = np.argmax(gaps) + left
 
         # left side
-        l_mass = mass[left:(gap_idx+1)]
+        l_mass = mass[left:(gap_idx + 1)]
         l_mean_mass = np.mean(l_mass)
         # further splitting needed？
-        if any(abs(l_mass - l_mean_mass)/l_mean_mass) > tol:
+        if any(abs(l_mass - l_mean_mass) / l_mean_mass) > tol:
             current_boundary = current_boundary + 1
             boundary_left[current_boundary] = left
             boundary_right[current_boundary] = gap_idx
         else:
-            mass[left:(gap_idx+1)] = np.mean(l_mass)
+            mass[left:(gap_idx + 1)] = np.mean(l_mass)
 
         # right side
-        r_mass = mass[(gap_idx+1):(right+1)]
+        r_mass = mass[(gap_idx + 1):(right + 1)]
         r_mean_mass = np.mean(r_mass)
         # further splitting needed?
         if any(abs(r_mass - r_mean_mass) / r_mean_mass > tol):
@@ -129,7 +129,7 @@ def bin_peaks(input_df, tol=10e-6):
             boundary_right[current_boundary] = right
         else:
             mass[(gap_idx + 1):(right + 1)] = r_mean_mass
-    
+
     output = pd.DataFrame({
         'scan': scan,
         'RT': RT,
@@ -139,8 +139,8 @@ def bin_peaks(input_df, tol=10e-6):
     return output
 
 
-##--------------check repeatability and variability--------------#
-#-------function for each group------#
+# --------------check repeatability and variability-------------- #
+# -------function for each group------ #
 def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
     # each name is a bin of mass, each group is a dataframe of a bin
     data = onegroup.sort_values(by='scan')  # 对scan排序
@@ -148,21 +148,21 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
     scan = np.array(data['scan'])
     rt = np.array(data['RT'])
     mass = np.array(data['mz'])
-    feat_labels = np.array(data['peakLabel'])
+    # feat_labels = np.array(data['peakLabel'])
     update_data = pd.DataFrame()
 
     # if this mass existed on 7 scans of range 10
     reset_scan = scan - np.min(scan)
-    tag = np.array([False] * (np.max(scan)-np.min(scan)+1))
+    tag = np.array([False] * (np.max(scan) - np.min(scan) + 1))
     tag[reset_scan] = True
-    neigh = math.ceil(n_scan/2)
+    neigh = math.ceil(n_scan / 2)
     retain_ind = []  # the scan index satisfied the repeatability
     if len(scan) >= n_scan:
         # 以n_scan+1的窗口长度对tag求和，再挑出 >n_rep的位置
-        tag = np.concatenate([np.array([False]*neigh), tag, np.array([False]*neigh)])
+        tag = np.concatenate([np.array([False] * neigh), tag, np.array([False] * neigh)])
         cumulative_sum = np.cumsum(tag)
         window_size = n_scan + 1
-        sliding_sums = cumulative_sum[window_size-1:] - np.concatenate([[0],cumulative_sum[:-window_size]])
+        sliding_sums = cumulative_sum[window_size - 1:] - np.concatenate([[0], cumulative_sum[:-window_size]])
         intersection = np.intersect1d(np.where(sliding_sums > n_rep)[0], reset_scan)
         retain_ind = np.where(np.isin(reset_scan, intersection))[0]
 
@@ -172,7 +172,7 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
         intensity4var = intensity[retain_ind]
         rt4var = rt[retain_ind]
         mass4var = mass[retain_ind]
-        feat_labels = feat_labels[retain_ind]
+        # feat_labels = feat_labels[retain_ind]
         # print('mass to be retained:', np.unique(mass[retain_ind]))
 
         # labeling each features[0 0 0 0 0 1 1 1 1 2 2 2 2 2...]
@@ -184,7 +184,7 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
         for i in np.unique(feat_labels):
             test_intensity = intensity4var[feat_labels == i]
 
-            if (np.max(test_intensity)-np.min(test_intensity))/np.mean(test_intensity) > var_ratio:
+            if (np.max(test_intensity) - np.min(test_intensity)) / np.mean(test_intensity) > var_ratio:
                 update_data = pd.DataFrame({
                     'scan': scan4var[feat_labels == i],
                     'RT': rt4var[feat_labels == i],
@@ -198,7 +198,7 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
 
 def check_rep_var(input_df):
     # initial peak label
-    input_df['peakLabel'] = np.array([0]*len(input_df))
+    input_df['peakLabel'] = np.array([0] * len(input_df))
 
     # grouping mass
     grouped_data = input_df.groupby('mz').apply(refine_group)
