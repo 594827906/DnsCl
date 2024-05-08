@@ -1,6 +1,6 @@
 import sys
 import os
-from plot import PlotWindow, ParameterWindow2, ProgressBarsListItem
+from plot import PlotWindow, denoise_parawindow, ProgressBarsListItem
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
@@ -73,15 +73,21 @@ class MainWindow(PlotWindow):
         Mass_defect_limit.triggered.connect(self.mass_defect_limit)
         denoise.addAction(Mass_defect_limit)
 
-        background_subtraction_denoise = QtWidgets.QAction("background subtraction denoise", self)
+        background_subtraction_denoise = QtWidgets.QAction("Background subtraction denoise", self)
         background_subtraction_denoise.triggered.connect(self.denoise)
         denoise.addAction(background_subtraction_denoise)
 
         # peak matching(step4)
-        matching = menu.addMenu('Matching')
-        peak_matching = QtWidgets.QAction('peak matching', self)
-        # peak_matching.triggered.connect(self.matching)
-        matching.addAction(peak_matching)
+        matching = menu.addMenu('Peak matching')
+        nl_identify = QtWidgets.QAction('中性丢失识别', self)
+        nl_identify.triggered.connect(self.nl)
+        fragment_identify = QtWidgets.QAction('特征碎片识别', self)
+        fragment_identify.triggered.connect(self.fragment)
+        isotope_differential = QtWidgets.QAction('同位素特征m/z差值', self)
+        isotope_differential.triggered.connect(self.isotope)
+        matching.addAction(nl_identify)
+        matching.addAction(fragment_identify)
+        matching.addAction(isotope_differential)
 
     def init_ui(self):
         self.setWindowTitle('DnsCl')
@@ -179,7 +185,7 @@ class MainWindow(PlotWindow):
         if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
             sample = self.sample_plotted_list[0]
             blank = self.blank_plotted_list[0]
-            subwindow = ParameterWindow1(sample, blank, self)
+            subwindow = defect_parawindow(sample, blank, self)
             subwindow.show()
         else:
             msg = QtWidgets.QMessageBox(self)
@@ -189,17 +195,24 @@ class MainWindow(PlotWindow):
             msg.exec_()
 
     def denoise(self):  # TODO: step 3
-        if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
-            sample = self.sample_plotted_list[0]
-            blank = self.blank_plotted_list[0]
-            subwindow = ParameterWindow2(sample, blank, self)
+        try:
+            subwindow = denoise_parawindow(self)
             subwindow.show()
-        else:
+        except ValueError:
+            # popup window with exception
             msg = QtWidgets.QMessageBox(self)
-            msg.setText('You should import 2 files as sample and blank each, first')
-            msg.setWindowTitle("Warning")
+            msg.setText("Check parameters, something is wrong!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
+
+    def nl(self):
+        pass
+
+    def fragment(self):
+        pass
+
+    def isotope(self):
+        pass
 
     def plot_processed(self, item):
         file = item.text()  # 获取文件名
@@ -378,7 +391,7 @@ class FileListWidget(ClickableListWidget):
         return self.file2path[item.text()]
 
 
-class ParameterWindow1(QtWidgets.QDialog):
+class defect_parawindow(QtWidgets.QDialog):
     def __init__(self, sample, blank, parent: MainWindow):
         self.parent = parent
         super().__init__(self.parent)

@@ -156,13 +156,11 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._canvas.draw()
 
 
-class ParameterWindow2(QtWidgets.QDialog):
-    def __init__(self, sample, blank, parent: PlotWindow):
+class denoise_parawindow(QtWidgets.QDialog):
+    def __init__(self, parent: PlotWindow):
         self.parent = parent
         super().__init__(self.parent)
         self.setWindowTitle('Background denoise option')
-        self.sample = sample
-        self.blank = blank
 
         # 字体设置
         font = QtGui.QFont()
@@ -170,6 +168,38 @@ class ParameterWindow2(QtWidgets.QDialog):
         font.setBold(True)
         font.setPixelSize(15)
         font.setWeight(75)
+
+        files_layout = QtWidgets.QVBoxLayout()
+        blank_choose_layout = QtWidgets.QHBoxLayout()
+        sample_choose_layout = QtWidgets.QHBoxLayout()
+        # 选择经过第二步处理的csv
+        choose_blank_label = QtWidgets.QLabel()
+        choose_blank_label.setText('Choose a .csv as blank:')
+        choose_blank_label.setFont(font)
+        self.blank_edit = QtWidgets.QLineEdit()
+        blank_button = QtWidgets.QToolButton()
+        blank_button.setText('...')
+        blank_button.setFont(font)
+        blank_button.clicked.connect(self.set_blank)
+
+        choose_sample_label = QtWidgets.QLabel()
+        choose_sample_label.setText('Choose a .csv as sample:')
+        choose_sample_label.setFont(font)
+        self.sample_edit = QtWidgets.QLineEdit()
+        sample_button = QtWidgets.QToolButton()
+        sample_button.setText('...')
+        sample_button.setFont(font)
+        sample_button.clicked.connect(self.set_blank)
+
+        blank_choose_layout.addWidget(self.blank_edit)
+        blank_choose_layout.addWidget(blank_button)
+        sample_choose_layout.addWidget(self.sample_edit)
+        sample_choose_layout.addWidget(sample_button)
+        files_layout.addWidget(choose_blank_label)
+        files_layout.addLayout(blank_choose_layout)
+        files_layout.addWidget(choose_sample_label)
+        files_layout.addLayout(sample_choose_layout)
+
 
         range_setting = QtWidgets.QFormLayout()
 
@@ -245,20 +275,39 @@ class ParameterWindow2(QtWidgets.QDialog):
         ok_button.setFont(font)
         ok_button.resize(80, 80)  # 未生效
 
+        para_layout = QtWidgets.QVBoxLayout()
+        para_layout.addLayout(range_setting)
+        para_layout.addLayout(ratio_setting)
+        para_layout.addWidget(ok_button)
+
         layout = QtWidgets.QVBoxLayout()
-        layout.addLayout(range_setting)
-        layout.addLayout(ratio_setting)
-        layout.addWidget(ok_button)
+        layout.addLayout(files_layout)
+        layout.addLayout(para_layout)
         self.setLayout(layout)
+
+    def set_blank(self):
+        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
+        if file:
+            self.blank_edit.setText(file)
+
+    def set_sample(self):
+        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
+        if file:
+            self.sample_edit.setText(file)
 
     def denoise(self):
         try:
+            blank = self.blank_edit.text()
+            sample = self.sample_edit.text()
             lower_rt = float(self.lower_rt.text())
             upper_rt = float(self.upper_rt.text())
             lower_mz = float(self.lower_mz.text())
             upper_mz = float(self.upper_mz.text())
             ratio = float(self.ratio.text())
             self.close()
+
+            #TODO: 选择第二步处理的csv
+
             pass
         except ValueError:
             # popup window with exception
