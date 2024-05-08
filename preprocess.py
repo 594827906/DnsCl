@@ -156,7 +156,7 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
     tag = np.array([False] * (np.max(scan) - np.min(scan) + 1))
     tag[reset_scan] = True
     neigh = math.ceil(n_scan / 2)
-    retain_ind = []  # the scan index satisfied the repeatability
+    #  retain_ind = []  # the scan index satisfied the repeatability
     if len(scan) >= n_scan:
         # 以n_scan+1的窗口长度对tag求和，再挑出 >n_rep的位置
         tag = np.concatenate([np.array([False] * neigh), tag, np.array([False] * neigh)])
@@ -166,32 +166,33 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
         intersection = np.intersect1d(np.where(sliding_sums > n_rep)[0], reset_scan)
         retain_ind = np.where(np.isin(reset_scan, intersection))[0]
 
-    # check variability
-    if np.size(retain_ind) > 0:
-        scan4var = scan[retain_ind]
-        intensity4var = intensity[retain_ind]
-        rt4var = rt[retain_ind]
-        mass4var = mass[retain_ind]
-        # feat_labels = feat_labels[retain_ind]
-        # print('mass to be retained:', np.unique(mass[retain_ind]))
+        # check variability
+        if np.size(retain_ind) > 0:
+            scan4var = scan[retain_ind]
+            intensity4var = intensity[retain_ind]
+            rt4var = rt[retain_ind]
+            mass4var = mass[retain_ind]
+            # feat_labels = feat_labels[retain_ind]
+            # print('mass to be retained:', np.unique(mass[retain_ind]))
 
-        # labeling each features[0 0 0 0 0 1 1 1 1 2 2 2 2 2...]
-        mask = np.zeros(len(scan4var), dtype=bool)
-        ind2reset = np.where(np.diff(scan4var) > 10)[0] + 1  # distance of two peaks are beyond 10 scans
-        mask[ind2reset] = True
-        feat_labels = np.cumsum(mask)
+            # labeling each features[0 0 0 0 0 1 1 1 1 2 2 2 2 2...]
+            mask = np.zeros(len(scan4var), dtype=bool)
+            ind2reset = np.where(np.diff(scan4var) > n_scan)[0] + 1  # distance of two peaks are beyond 10 scans
+            mask[ind2reset] = True
+            feat_labels = np.cumsum(mask)
 
-        for i in np.unique(feat_labels):
-            test_intensity = intensity4var[feat_labels == i]
+            for i in np.unique(feat_labels):
+                test_intensity = intensity4var[feat_labels == i]
 
-            if (np.max(test_intensity) - np.min(test_intensity)) / np.mean(test_intensity) > var_ratio:
-                update_data = pd.DataFrame({
-                    'scan': scan4var[feat_labels == i],
-                    'RT': rt4var[feat_labels == i],
-                    'intensity': test_intensity,
-                    'peakLabel': np.array(feat_labels[feat_labels == i]),
-                    'mz': mass4var[feat_labels == i]
-                })
+                if (np.max(test_intensity) - np.min(test_intensity)) / np.min(test_intensity) > var_ratio:
+                    temp = pd.DataFrame({
+                        'scan': scan4var[feat_labels == i],
+                        'RT': rt4var[feat_labels == i],
+                        'intensity': test_intensity,
+                        'peakLabel': np.array(feat_labels[feat_labels == i]),
+                        'mz': mass4var[feat_labels == i]
+                    })
+                    update_data = pd.concat([update_data, temp], ignore_index=True)
 
         return update_data
 
