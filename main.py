@@ -1,6 +1,6 @@
 import sys
 import os
-from plot import PlotWindow, denoise_parawindow, ProgressBarsListItem
+from plot import PlotWindow, denoise_parawindow, match_parawindow1, ProgressBarsListItem
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
@@ -79,9 +79,9 @@ class MainWindow(PlotWindow):
 
         # peak matching(step4)
         matching = menu.addMenu('Peak matching')
-        nl_identify = QtWidgets.QAction('中性丢失识别', self)
+        nl_identify = QtWidgets.QAction('Neutral loss match', self)
         nl_identify.triggered.connect(self.nl)
-        fragment_identify = QtWidgets.QAction('特征碎片识别', self)
+        fragment_identify = QtWidgets.QAction('Feature fragment recognition', self)
         fragment_identify.triggered.connect(self.fragment)
         isotope_differential = QtWidgets.QAction('同位素特征m/z差值', self)
         isotope_differential.triggered.connect(self.isotope)
@@ -194,7 +194,7 @@ class MainWindow(PlotWindow):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def denoise(self):  # TODO: step 3
+    def denoise(self):
         try:
             subwindow = denoise_parawindow(self)
             subwindow.show()
@@ -206,7 +206,15 @@ class MainWindow(PlotWindow):
             msg.exec_()
 
     def nl(self):
-        pass
+        try:
+            subwindow = match_parawindow1(self)
+            subwindow.show()
+        except ValueError:
+            # popup window with exception
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Check parameters, something is wrong!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
 
     def fragment(self):
         pass

@@ -6,6 +6,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
 from background_subtract import denoise_bg
+from peak_extraction import neut_loss
 import pymzml
 import pyteomics.mzxml as mzxml
 import numpy as np
@@ -288,7 +289,7 @@ class denoise_parawindow(QtWidgets.QDialog):
             self.close()
 
             # TODO:确认rt和mz的单位
-            worker = Worker('Background subtract enoising...', denoise_bg,
+            worker = Worker('Background subtract denoising...', denoise_bg,
                             blank, sample, mz_win*10e-7, rt_win/60, ratio)
             # worker.signals.result.connect(partial(self.result_to_csv, 'denoise_Area.csv'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
@@ -303,6 +304,133 @@ class denoise_parawindow(QtWidgets.QDialog):
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
         # self.parent.list_of_processed.addFile(name)
+
+
+class match_parawindow1(QtWidgets.QDialog):
+    def __init__(self, parent: PlotWindow):
+        self.parent = parent
+        super().__init__(self.parent)
+        self.setWindowTitle('Peak match option')
+        self._thread_pool = QtCore.QThreadPool()
+
+        # 字体设置
+        font = QtGui.QFont()
+        font.setFamily('Arial')
+        font.setBold(True)
+        font.setPixelSize(15)
+        font.setWeight(75)
+
+        files_layout = QtWidgets.QVBoxLayout()
+        blank_choose_layout = QtWidgets.QHBoxLayout()
+        # 选择经过第三步处理的csv
+        choose_subtracted_label = QtWidgets.QLabel()
+        choose_subtracted_label.setText('Choose a .csv that have been subtracted:')
+        choose_subtracted_label.setFont(font)
+        self.file_edit = QtWidgets.QLineEdit()
+        subtracted_button = QtWidgets.QToolButton()
+        subtracted_button.setText('...')
+        subtracted_button.setFont(font)
+        subtracted_button.clicked.connect(self.set_file)
+
+        blank_choose_layout.addWidget(self.file_edit)
+        blank_choose_layout.addWidget(subtracted_button)
+        files_layout.addWidget(choose_subtracted_label)
+        files_layout.addLayout(blank_choose_layout)
+
+        range_setting = QtWidgets.QFormLayout()
+
+        nl_setting = QtWidgets.QFormLayout()
+        nl_setting.alignment()
+
+        nl_label = QtWidgets.QLabel("Neutral Loss： ")
+        nl_label.setFont(font)
+        self.nl_set = QtWidgets.QLineEdit()
+        self.nl_set.setText('63.96125')
+        self.nl_set.setFixedSize(150, 30)
+        self.nl_set.setFont(font)
+        nl_layout = QtWidgets.QHBoxLayout()
+        nl_text = QtWidgets.QLabel(self)
+        nl_text.setText('Da')
+        nl_text.setFont(font)
+        nl_layout.addWidget(self.nl_set)
+        nl_layout.addWidget(nl_text)
+        nl_layout.addStretch()  # 什么用处？
+
+        rt_label = QtWidgets.QLabel("RT tolerance： ±")
+        rt_label.setFont(font)
+        self.rt_window = QtWidgets.QLineEdit()
+        self.rt_window.setText('30')
+        self.rt_window.setFixedSize(50, 30)
+        self.rt_window.setFont(font)
+        rt_layout = QtWidgets.QHBoxLayout()
+        rt_text = QtWidgets.QLabel(self)
+        rt_text.setText('s')
+        rt_text.setFont(font)
+        rt_layout.addWidget(self.rt_window)
+        rt_layout.addWidget(rt_text)
+
+        mz_label = QtWidgets.QLabel("m/z tolerance： ±")
+        mz_label.setFont(font)
+        self.mz_window = QtWidgets.QLineEdit()
+        self.mz_window.setText('10')
+        self.mz_window.setFixedSize(50, 30)
+        self.mz_window.setFont(font)
+        mz_layout = QtWidgets.QHBoxLayout()
+        mz_text1 = QtWidgets.QLabel(self)
+        mz_text1.setText('ppm')
+        mz_text1.setFont(font)
+        mz_layout.addWidget(self.mz_window)
+        mz_layout.addWidget(mz_text1)
+
+        nl_setting.addRow(nl_label, nl_layout)
+        range_setting.addRow(rt_label, rt_layout)
+        range_setting.addRow(mz_label, mz_layout)
+        # range_setting.setLabelAlignment(Q)
+
+        ok_button = QtWidgets.QPushButton('OK')
+        ok_button.clicked.connect(self.nl)
+        ok_button.setFont(font)
+        ok_button.resize(80, 80)  # 未生效
+
+        para_layout = QtWidgets.QVBoxLayout()
+        para_layout.addLayout(nl_setting)
+        para_layout.addLayout(range_setting)
+        para_layout.addWidget(ok_button)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addLayout(files_layout)
+        layout.addLayout(para_layout)
+        self.setLayout(layout)
+
+    def set_file(self):
+        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
+        if file:
+            self.file_edit.setText(file)
+
+    def nl(self):
+        try:
+            path = self.file_edit.text()
+            nl = float(self.nl_set.text())
+            rt_win = float(self.rt_window.text())
+            mz_win = float(self.mz_window.text())
+            self.close()
+
+            # TODO:确认rt和mz的单位
+            worker = Worker('Neutral loss matching...', neut_loss, path, nl, mz_win*10e-7, rt_win/60)
+            worker.signals.result.connect(partial(self.result_to_csv, 'NL.csv'))  # TODO:list转表格？
+            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker)
+        except ValueError:
+            # popup window with exception
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Check parameters, something is wrong!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+
+    def result_to_csv(self, name, df):
+        # df.to_csv(name, index=False)
+        # self.parent.list_of_processed.addFile(name)
+        pass
 
 
 class ProgressBarsListItem(QtWidgets.QWidget):
