@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
-from df_process_test import construct_df
+from background_subtract import denoise_bg
 import pymzml
 import pyteomics.mzxml as mzxml
 import numpy as np
@@ -161,6 +161,7 @@ class denoise_parawindow(QtWidgets.QDialog):
         self.parent = parent
         super().__init__(self.parent)
         self.setWindowTitle('Background denoise option')
+        self._thread_pool = QtCore.QThreadPool()
 
         # 字体设置
         font = QtGui.QFont()
@@ -189,7 +190,7 @@ class denoise_parawindow(QtWidgets.QDialog):
         sample_button = QtWidgets.QToolButton()
         sample_button.setText('...')
         sample_button.setFont(font)
-        sample_button.clicked.connect(self.set_blank)
+        sample_button.clicked.connect(self.set_sample)
 
         blank_choose_layout.addWidget(self.blank_edit)
         blank_choose_layout.addWidget(blank_button)
@@ -203,58 +204,40 @@ class denoise_parawindow(QtWidgets.QDialog):
 
         range_setting = QtWidgets.QFormLayout()
 
-        rt_label = QtWidgets.QLabel("RT window")
+        rt_label = QtWidgets.QLabel("RT window： ±")
         rt_label.setFont(font)
-        self.lower_rt = QtWidgets.QLineEdit()
-        self.lower_rt.setText('2.5')
-        self.lower_rt.setFixedSize(60, 30)
-        self.lower_rt.setFont(font)
-        self.upper_rt = QtWidgets.QLineEdit()
-        self.upper_rt.setText('30.0')
-        self.upper_rt.setFixedSize(60, 30)
-        self.upper_rt.setFont(font)
+        self.rt_window = QtWidgets.QLineEdit()
+        self.rt_window.setText('5')
+        self.rt_window.setFixedSize(50, 30)
+        self.rt_window.setFont(font)
         rt_layout = QtWidgets.QHBoxLayout()
-        rt_text1 = QtWidgets.QLabel(self)
-        rt_text1.setText('to')
-        rt_text1.setFont(font)
-        rt_text2 = QtWidgets.QLabel(self)
-        rt_text2.setText('min.')
-        rt_text2.setFont(font)
-        rt_layout.addWidget(self.lower_rt)
-        rt_layout.addWidget(rt_text1)
-        rt_layout.addWidget(self.upper_rt)
-        rt_layout.addWidget(rt_text2)
+        rt_text = QtWidgets.QLabel(self)
+        rt_text.setText('s')
+        rt_text.setFont(font)
+        rt_layout.addWidget(self.rt_window)
+        rt_layout.addWidget(rt_text)
 
-        mz_label = QtWidgets.QLabel("m/z window")
+        mz_label = QtWidgets.QLabel("m/z window： ±")
         mz_label.setFont(font)
-        self.lower_mz = QtWidgets.QLineEdit()
-        self.lower_mz.setText('150.0')
-        self.lower_mz.setFixedSize(60, 30)
-        self.lower_mz.setFont(font)
-        self.upper_mz = QtWidgets.QLineEdit()
-        self.upper_mz.setText('1000.0')
-        self.upper_mz.setFixedSize(60, 30)
-        self.upper_mz.setFont(font)
+        self.mz_window = QtWidgets.QLineEdit()
+        self.mz_window.setText('10')
+        self.mz_window.setFixedSize(50, 30)
+        self.mz_window.setFont(font)
         mz_layout = QtWidgets.QHBoxLayout()
         mz_text1 = QtWidgets.QLabel(self)
-        mz_text1.setText('to')
+        mz_text1.setText('ppm')
         mz_text1.setFont(font)
-        mz_text2 = QtWidgets.QLabel(self)
-        mz_text2.setText('Da')
-        mz_text2.setFont(font)
-        mz_layout.addWidget(self.lower_mz)
+        mz_layout.addWidget(self.mz_window)
         mz_layout.addWidget(mz_text1)
-        mz_layout.addWidget(self.upper_mz)
-        mz_layout.addWidget(mz_text2)
 
         ratio_setting = QtWidgets.QFormLayout()
         ratio_setting.alignment()
 
-        ratio_label = QtWidgets.QLabel("Sample/Blank Ratio")
+        ratio_label = QtWidgets.QLabel("Sample/Blank Ratio： ")
         ratio_label.setFont(font)
         self.ratio = QtWidgets.QLineEdit()
         self.ratio.setText('10')
-        self.ratio.setFixedSize(60, 30)
+        self.ratio.setFixedSize(50, 30)
         self.ratio.setFont(font)
         ratio_layout = QtWidgets.QHBoxLayout()
         ratio_text = QtWidgets.QLabel(self)
@@ -299,22 +282,27 @@ class denoise_parawindow(QtWidgets.QDialog):
         try:
             blank = self.blank_edit.text()
             sample = self.sample_edit.text()
-            lower_rt = float(self.lower_rt.text())
-            upper_rt = float(self.upper_rt.text())
-            lower_mz = float(self.lower_mz.text())
-            upper_mz = float(self.upper_mz.text())
+            rt_win = float(self.rt_window.text())
+            mz_win = float(self.mz_window.text())
             ratio = float(self.ratio.text())
             self.close()
 
-            #TODO: 选择第二步处理的csv
-
-            pass
+            # TODO:确认rt和mz的单位
+            worker = Worker('Background subtract enoising...', denoise_bg,
+                            blank, sample, mz_win*10e-7, rt_win/60, ratio)
+            # worker.signals.result.connect(partial(self.result_to_csv, 'denoise_Area.csv'))
+            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker)
         except ValueError:
             # popup window with exception
             msg = QtWidgets.QMessageBox(self)
             msg.setText("Check parameters, something is wrong!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
+
+    def result_to_csv(self, name, df):
+        df.to_csv(name, index=False)
+        # self.parent.list_of_processed.addFile(name)
 
 
 class ProgressBarsListItem(QtWidgets.QWidget):

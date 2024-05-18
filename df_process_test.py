@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import gc
 
 # path = r'D:\Bionet\DnsCl\sample_pre.csv'
-path = r'C:\John\DnsCl\sample_pre.csv'
+path = r'C:\John\DnsCl\denoise_Area.csv'
 
 
 def construct_df(file, label):  # 从处理后的df中绘制TIC图
