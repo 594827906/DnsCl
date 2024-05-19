@@ -15,9 +15,9 @@ import glob
 '''
 
 # file_path = r'D:\Bionet\DnsCl\denoise_list.csv'
-#
+
 # mzXML_list = glob.glob(os.path.join(file_path, '*.mzXML'))
-#
+
 # data = pd.read_csv('denoise_peaklist.csv')
 
 
@@ -100,7 +100,8 @@ def obtain_MS2(mzXML_file):
 
 
 ##----------------------  function for  MS/MS matching-----------------------#
-def match_MS2(input_df, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=156.08153):
+def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=156.08153):
+    input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
     new_ms2 = pd.concat([new_left, new_right], axis=1)

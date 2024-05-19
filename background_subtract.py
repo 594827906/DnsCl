@@ -143,7 +143,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         'RT': rt_list,
         'scan': scan_list,
     })
-    output2.to_csv('denoise_tic.csv', index=False)
+    output2.to_csv('denoise_intermediate.csv', index=False)  # 用于后续处理的中间文件
     # return output1, output2
 
 # read preprocessed data

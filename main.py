@@ -1,6 +1,6 @@
 import sys
 import os
-from plot import PlotWindow, denoise_parawindow, match_parawindow1, ProgressBarsListItem
+from plot import PlotWindow, denoise_parawindow, match_parawindow1, match_parawindow2, ProgressBarsListItem
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
@@ -207,7 +207,7 @@ class MainWindow(PlotWindow):
 
     def nl(self):
         try:
-            subwindow = match_parawindow1(self)
+            subwindow = match_parawindow1('1', self)
             subwindow.show()
         except ValueError:
             # popup window with exception
@@ -217,10 +217,26 @@ class MainWindow(PlotWindow):
             msg.exec_()
 
     def fragment(self):
-        pass
+        try:
+            subwindow = match_parawindow2(self)
+            subwindow.show()
+        except ValueError:
+            # popup window with exception
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Check parameters, something is wrong!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
 
     def isotope(self):
-        pass
+        try:
+            subwindow = match_parawindow1('3', self)
+            subwindow.show()
+        except ValueError:
+            # popup window with exception
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Check parameters, something is wrong!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
 
     def plot_processed(self, item):
         file = item.text()  # 获取文件名
