@@ -529,6 +529,7 @@ class match_parawindow2(QtWidgets.QDialog):
         fragment_layout.addWidget(self.fragment_set)
         fragment_layout.addWidget(fragment_text)
         fragment_layout.addStretch()
+        # TODO: 增加一行输入格式提示
 
         rt_label = QtWidgets.QLabel("RT tolerance: ±")
         rt_label.setFont(font)
@@ -543,8 +544,22 @@ class match_parawindow2(QtWidgets.QDialog):
         rt_layout.addWidget(self.rt_window)
         rt_layout.addWidget(rt_text)
 
+        mz_label = QtWidgets.QLabel("m/z tolerance: ±")
+        mz_label.setFont(font)
+        self.mz_window = QtWidgets.QLineEdit()
+        self.mz_window.setText('10')
+        self.mz_window.setFixedSize(50, 30)
+        self.mz_window.setFont(font)
+        mz_layout = QtWidgets.QHBoxLayout()
+        mz_text = QtWidgets.QLabel(self)
+        mz_text.setText('ppm')
+        mz_text.setFont(font)
+        mz_layout.addWidget(self.mz_window)
+        mz_layout.addWidget(mz_text)
+
         fragment_setting.addRow(fragment_label, fragment_layout)
         range_setting.addRow(rt_label, rt_layout)
+        range_setting.addRow(mz_label, mz_layout)
         # range_setting.setLabelAlignment(Q)
 
         ok_button = QtWidgets.QPushButton('OK')
@@ -576,8 +591,9 @@ class match_parawindow2(QtWidgets.QDialog):
         try:
             path1 = self.mzxml_edit.text()
             path2 = self.subtracted_edit.text()
-            fragment = float(self.fragment_set.text())
+            fragment = self.fragment_set.text()
             rt_win = float(self.rt_window.text())
+            mz_win = float(self.mz_window.text())
             self.close()
 
             # TODO:结果为list，如何保存

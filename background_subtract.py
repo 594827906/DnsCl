@@ -6,13 +6,7 @@
 """
 import pandas as pd
 import numpy as np
-import os
-import time
-import csv
 
-
-# file_path = r'¾ø¶ÔÂ·¾¶'
-#
 
 def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
     blk_df = pd.read_csv(blank)
@@ -57,6 +51,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         if not is_in_range:  # if unmatch
 
             for p in np.unique(plab_sample):
+                num_peak += 1
                 record_mass1.append(np.median(mass_sam[ind_of_sample][plab_sample == p]))
                 record_mass2.append(np.median(mass_sam[ind_of_sample][plab_sample == p]))
                 rt_max.append(np.max(rt_sam[ind_of_sample][plab_sample == p]))
@@ -133,7 +128,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         'Area (Sample)': area_sam,
         'Area Ratio': area_ratio
     })
-    output1.to_csv('denoise_list.csv', index=False)
+    output1.to_csv('denoise_final_list.csv', index=False)
 
     output2 = pd.DataFrame({
         'Label_peak': plab_matched,

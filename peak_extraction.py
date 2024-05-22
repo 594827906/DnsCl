@@ -4,21 +4,12 @@
 import pandas as pd
 import numpy as np
 import pyteomics.mzxml as mzxml
-import os
-import time
-import glob
 
 '''
 1¡¢Neutral Loss
 2¡¢MS/MS
 3¡¢d6
 '''
-
-# file_path = r'D:\Bionet\DnsCl\denoise_list.csv'
-
-# mzXML_list = glob.glob(os.path.join(file_path, '*.mzXML'))
-
-# data = pd.read_csv('denoise_peaklist.csv')
 
 
 ##------------function for checking neutral loss-----------------------#
@@ -113,7 +104,7 @@ def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=
     ind1 = np.where(np.abs(ms2mz-tar1)/tar1 < tol_mz)[0]
     ind2 = np.where(np.abs(ms2mz-tar2)/tar2 < tol_mz)[0]
 
-    exist_precmz = np.unique(np.union1d(precusormz[ind1],precusormz[ind2]))
+    exist_precmz = np.unique(np.union1d(precusormz[ind1], precusormz[ind2]))
     mz_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['precusormz'])
     rt_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['RT'])
 
@@ -127,7 +118,7 @@ def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=
         if np.size(ind) >= 1:
             # print(ind)
             for p in np.arange(len(ind)):
-                temp_inten = np.array(intensity_den[ind][p][1:-1].split(','),dtype=np.float64)
+                temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
                 max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
 
                 if np.abs(max_rt-rt_list[i]) <= tol_rt:
