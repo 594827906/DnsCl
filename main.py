@@ -6,7 +6,6 @@ from functools import partial
 from utils.threading import Worker
 from df_process_test import construct_df
 from preprocess import defect_process
-import matplotlib.pyplot as plt
 
 
 class MainWindow(PlotWindow):
@@ -20,9 +19,8 @@ class MainWindow(PlotWindow):
         self.show()
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.blank_file.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
-        self.sample_file.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
-        self.list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
+        self._list_of_mzxml.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
+        self._list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
         # self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
 
     def _create_menu(self):
@@ -33,12 +31,9 @@ class MainWindow(PlotWindow):
         file = menu.addMenu('File')
 
         # 导入mzxml文件
-        blank_mzxml_import = QtWidgets.QAction('Open *.mzXML as blank', self)
-        blank_mzxml_import.triggered.connect(partial(self._open_mzxml, 'blank'))
-        file.addAction(blank_mzxml_import)
-        sample_mzxml_import = QtWidgets.QAction('Open *.mzXML as sample', self)
-        sample_mzxml_import.triggered.connect(partial(self._open_mzxml, 'sample'))
-        file.addAction(sample_mzxml_import)
+        mzxml_import = QtWidgets.QAction('Open *.mzXML', self)
+        mzxml_import.triggered.connect(self._open_mzxml)
+        file.addAction(mzxml_import)
         # 直接导入处理过的文件(csv)
         csv_import = QtWidgets.QAction('Open processed file (*.csv)', self)
         csv_import.triggered.connect(self._open_csv)
@@ -93,20 +88,16 @@ class MainWindow(PlotWindow):
         self.setWindowTitle('DnsCl')
 
         # 左侧布局
-        blank_label = QtWidgets.QLabel('Blank list：')
-        self.blank_file = FileListWidget()
-        sample_label = QtWidgets.QLabel('Sample list：')
-        self.sample_file = FileListWidget()
-        process_list_label = QtWidgets.QLabel('Processed list：')
-        self.list_of_processed = FileListWidget()
+        mzxml_list_label = QtWidgets.QLabel('.mzXML file list：')
+        self._list_of_mzxml = FileListWidget()
+        process_list_label = QtWidgets.QLabel('Processed file list：')
+        self._list_of_processed = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout()
-        layout_left.addWidget(blank_label)
-        layout_left.addWidget(self.blank_file, 2)
-        layout_left.addWidget(sample_label)
-        layout_left.addWidget(self.sample_file, 2)
+        layout_left.addWidget(mzxml_list_label)
+        layout_left.addWidget(self._list_of_mzxml, 2)
         layout_left.addWidget(process_list_label)
-        layout_left.addWidget(self.list_of_processed, 6)
+        layout_left.addWidget(self._list_of_processed, 6)
 
         # 中间布局
         layout_mid = QtWidgets.QHBoxLayout()
@@ -134,29 +125,18 @@ class MainWindow(PlotWindow):
 
         self.setCentralWidget(widget)
 
-    def _open_mzxml(self, mode):
-        if mode == 'blank':
-            path = QtWidgets.QFileDialog.getOpenFileName(None, 'select a file as blank', '', 'mzXML (*.mzXML)')[0]
-            file_name = os.path.basename(path)
-            self.blank_file.addFile(file_name)
-            plotted, _ = self.plot_tic(path, mode='blank')
-            if plotted:
-                self.blank_plotted_list.append(path)
-        elif mode == 'sample':
-            path = QtWidgets.QFileDialog.getOpenFileName(None, 'select a file as sample', '', 'mzXML (*.mzXML)')[0]
-            file_name = os.path.basename(path)
-            self.sample_file.addFile(file_name)
-            plotted, _ = self.plot_tic(path, mode='sample')
-            if plotted:
-                self.sample_plotted_list.append(path)
+    def _open_mzxml(self):
+        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML)')[0]
+        for name in files_names:
+            self._list_of_mzxml.addFile(name)
 
     def _open_csv(self):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'csv (*.csv)')[0]
         for name in files_names:
-            self.list_of_processed.addFile(name)
+            self._list_of_processed.addFile(name)
 
     def _export_features(self, mode):
-        if self.blank_file.count() > 0:
+        if self._list_of_mzxml.count() > 0:
             if mode == 'csv':
                 # to do: features should be QTreeWidget (root should keep basic information: files and parameters)
                 files = self._feature_parameters['files']
@@ -182,15 +162,13 @@ class MainWindow(PlotWindow):
             msg.exec_()
 
     def mass_defect_limit(self):  # step 2
-        if len(self.sample_plotted_list) > 0 and len(self.blank_plotted_list) > 0:
-            sample = self.sample_plotted_list[0]
-            blank = self.blank_plotted_list[0]
-            subwindow = defect_parawindow(sample, blank, self)
+        try:
+            subwindow = defect_parawindow(self)
             subwindow.show()
-        else:
+        except ValueError:
+            # popup window with exception
             msg = QtWidgets.QMessageBox(self)
-            msg.setText('You should import 2 files as sample and blank each, first')
-            msg.setWindowTitle("Warning")
+            msg.setText("Check parameters, something is wrong!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
@@ -238,23 +216,23 @@ class MainWindow(PlotWindow):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def plot_processed(self, item):
-        file = item.text()  # 获取文件名
-        file_path = self.list_of_processed.getPath(item)
-        obj = construct_df(file_path, file)
-        x = obj['x']
-        y = obj['y']
-        label = obj['label']
-
-        fig = plt.figure(dpi=300, figsize=(24, 6))
-        # fig = plt.subplot(111)
-        plt.title('Processed TIC')
-        plt.xlabel('time')
-        plt.ylabel('intensity')
-        plt.plot(x, y, label=label)
-        plt.legend(loc='best')
-        plt.grid(alpha=0.8)
-        fig.show()
+    # def plot_processed(self, item):
+    #     file = item.text()  # 获取文件名
+    #     file_path = self.list_of_processed.getPath(item)
+    #     obj = construct_df(file_path, file)
+    #     x = obj['x']
+    #     y = obj['y']
+    #     label = obj['label']
+    #
+    #     fig = plt.figure(dpi=300, figsize=(24, 6))
+    #     # fig = plt.subplot(111)
+    #     plt.title('Processed TIC')
+    #     plt.xlabel('time')
+    #     plt.ylabel('intensity')
+    #     plt.plot(x, y, label=label)
+    #     plt.legend(loc='best')
+    #     plt.grid(alpha=0.8)
+    #     fig.show()
 
 
 class ProcessedListMenu(QtWidgets.QMenu):
@@ -265,18 +243,33 @@ class ProcessedListMenu(QtWidgets.QMenu):
 
         menu = QtWidgets.QMenu(parent)
 
-        plot = QtWidgets.QAction('show TIC', parent)
+        top = QtWidgets.QAction('Plot at the top', parent)
+        bottom = QtWidgets.QAction('Plot at the bottom', parent)
+        clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
-        menu.addAction(plot)
+        menu.addAction(top)
+        menu.addAction(bottom)
+        menu.addAction(clear)
         menu.addAction(close)
 
         action = menu.exec_(QtGui.QCursor.pos())
 
-        if action == plot:
-            self.plot()
-        elif action == close:
+        for file in self.get_selected_files():
+            file = file.text()
+            if action == top:
+                plotted, path = self.parent.plot_processed(file, mode='top')
+                if plotted:
+                    self.parent.mzxml_plotted_list.append(path)
+            elif action == bottom:
+                plotted, path = self.parent.plot_processed(file, mode='bottom')
+                if plotted:
+                    self.parent.mzxml_plotted_list.append(path)
+
+        if action == close:
             self.close_files()
+        elif action == clear:
+            self.delete_tic()
 
     def plot(self):
         for item in self.get_selected_files():
@@ -288,10 +281,15 @@ class ProcessedListMenu(QtWidgets.QMenu):
 
     def close_files(self):
         for item in self.get_selected_files():
-            self.parent.list_of_processed.deleteFile(item)
+            self.parent._list_of_processed.deleteFile(item)
 
     def get_selected_files(self):
-        return self.parent.list_of_processed.selectedItems()
+        return self.parent._list_of_processed.selectedItems()
+
+    def delete_tic(self):  # TODO:新版本待调试
+        for item in self.get_selected_files():
+            self.parent.delete_line(item.text())
+        self.parent.refresh_canvas()
 
 
 class FileListMenu(QtWidgets.QMenu):
@@ -301,28 +299,28 @@ class FileListMenu(QtWidgets.QMenu):
 
         menu = QtWidgets.QMenu(parent)
 
-        # sample = QtWidgets.QAction('Plot as sample', parent)
-        # blank = QtWidgets.QAction('Plot as blank', parent)
+        top = QtWidgets.QAction('Plot at the top', parent)
+        bottom = QtWidgets.QAction('Plot at the bottom', parent)
         clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
-        # menu.addAction(sample)
-        # menu.addAction(blank)
+        menu.addAction(top)
+        menu.addAction(bottom)
         menu.addAction(clear)
         menu.addAction(close)
 
         action = menu.exec_(QtGui.QCursor.pos())
 
-        # for file in self.get_selected_files():
-        #     file = file.text()
-        #     if action == sample:
-        #         plotted, path = self.parent.plot_tic(file, mode='sample')
-        #         if plotted:
-        #             self.parent.sample_plotted_list.append(path)
-        #     elif action == blank:
-        #         plotted, path = self.parent.plot_tic(file, mode='blank')
-        #         if plotted:
-        #             self.parent.blank_plotted_list.append(path)
+        for file in self.get_selected_files():
+            file = file.text()
+            if action == top:
+                plotted, path = self.parent.plot_tic(file, mode='top')
+                if plotted:
+                    self.parent.mzxml_plotted_list.append(path)
+            elif action == bottom:
+                plotted, path = self.parent.plot_tic(file, mode='bottom')
+                if plotted:
+                    self.parent.mzxml_plotted_list.append(path)
 
         if action == close:
             self.close_files()
@@ -336,10 +334,10 @@ class FileListMenu(QtWidgets.QMenu):
 
     def close_files(self):  # TODO: 将sample和blank的list管理分开
         for item in self.get_selected_files():
-            self.parent.blank_file.deleteFile(item)
+            self.parent._list_of_mzxml.deleteFile(item)
 
     def get_selected_files(self):
-        return self.parent.blank_file.selectedItems()
+        return self.parent._list_of_mzxml.selectedItems()
 
 
 class ClickableListWidget(QtWidgets.QListWidget):
@@ -416,12 +414,10 @@ class FileListWidget(ClickableListWidget):
 
 
 class defect_parawindow(QtWidgets.QDialog):
-    def __init__(self, sample, blank, parent: MainWindow):
+    def __init__(self, parent: MainWindow):
         self.parent = parent
         super().__init__(self.parent)
         self.setWindowTitle('Mass defect limit option')
-        self.sample = sample
-        self.blank = blank
         self._thread_pool = QtCore.QThreadPool()
 
         # 字体设置
@@ -430,6 +426,23 @@ class defect_parawindow(QtWidgets.QDialog):
         font.setBold(True)
         font.setPixelSize(15)
         font.setWeight(75)
+
+        files_layout = QtWidgets.QVBoxLayout()
+        file_choose_layout = QtWidgets.QHBoxLayout()
+
+        choose_file_label = QtWidgets.QLabel()
+        choose_file_label.setText('Choose a .mzXML to defect:')
+        choose_file_label.setFont(font)
+        self.mzxml_path = QtWidgets.QLineEdit()
+        choose_button = QtWidgets.QToolButton()
+        choose_button.setText('...')
+        choose_button.setFont(font)
+        choose_button.clicked.connect(self.set_file)
+
+        file_choose_layout.addWidget(self.mzxml_path)
+        file_choose_layout.addWidget(choose_button)
+        files_layout.addWidget(choose_file_label)
+        files_layout.addLayout(file_choose_layout)
 
         range_setting = QtWidgets.QFormLayout()
 
@@ -544,13 +557,20 @@ class defect_parawindow(QtWidgets.QDialog):
         ok_button.resize(80, 80)  # 未生效
 
         layout = QtWidgets.QVBoxLayout()
+        layout.addLayout(files_layout)
         layout.addLayout(range_setting)
         layout.addLayout(para_setting)
         layout.addWidget(ok_button)
         self.setLayout(layout)
 
+    def set_file(self):
+        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'mzxml(*.mzXML)')
+        if file:
+            self.mzxml_path.setText(file)
+
     def defect(self):
         try:
+            self.path = self.mzxml_path.text()
             self.lower_rt = float(self.lower_rt.text())
             self.upper_rt = float(self.upper_rt.text())
             self.lower_mz = float(self.lower_mz.text())
@@ -561,10 +581,12 @@ class defect_parawindow(QtWidgets.QDialog):
             self.intensity_thd = float(self.intensity_thd.text())
             self.close()
 
-            worker = Worker('processing blank...', defect_process, self.blank, self.lower_rt, self.upper_rt,
+            file_name = os.path.basename(self.path)
+            name, extension = os.path.splitext(file_name)
+            worker = Worker('Defecting ...', defect_process, self.path, self.lower_rt, self.upper_rt,
                             self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
-            worker.signals.result.connect(partial(self.result_to_csv, 'blank_pre.csv'))
-            worker.signals.result.connect(self.start_sample)
+            worker.signals.result.connect(partial(self.result_to_csv, name+'_defected.csv'))  # TODO:传入原始文件名
+            # worker.signals.result.connect(self.start_sample)
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
         except ValueError:
@@ -574,16 +596,16 @@ class defect_parawindow(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def start_sample(self):
-        worker1 = Worker('processing sample...', defect_process, self.sample, self.lower_rt, self.upper_rt,
-                         self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
-        worker1.signals.result.connect(partial(self.result_to_csv, 'sample_pre.csv'))
-        worker1.signals.close_signal.connect(worker1.progress_dialog.close)
-        self._thread_pool.start(worker1)
+    # def start_sample(self):
+    #     worker1 = Worker('processing sample...', defect_process, self.sample, self.lower_rt, self.upper_rt,
+    #                      self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
+    #     worker1.signals.result.connect(partial(self.result_to_csv, 'sample_pre.csv'))
+    #     worker1.signals.close_signal.connect(worker1.progress_dialog.close)
+    #     self._thread_pool.start(worker1)
 
     def result_to_csv(self, name, df):
         df.to_csv(name)
-        self.parent.list_of_processed.addFile(name)
+        self.parent._list_of_processed.addFile(name)
 
 
 style_sheet = """

@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import gc
 
 # path = r'D:\Bionet\DnsCl\sample_pre.csv'
-path = r'C:\John\DnsCl\denoise_Area.csv'
+# path = r'C:\John\DnsCl\denoise_Area.csv'
 
 
-def construct_df(file, label):  # 从处理后的df中绘制TIC图
+def construct_df(file, label, mode):  # 从处理后的df中绘制TIC图
     time = []
     tic = []
     df = pd.read_csv(file)
@@ -30,7 +30,7 @@ def construct_df(file, label):  # 从处理后的df中绘制TIC图
 
     del df
     gc.collect()  # 回收内存
-    return {'x': time, 'y': tic, 'label': label}
+    return {'x': time, 'y': tic, 'label': label, 'mode': mode}
 
 
 # obj = construct_df(path)

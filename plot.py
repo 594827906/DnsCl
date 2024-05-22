@@ -7,6 +7,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from utils.threading import Worker
 from background_subtract import denoise_bg
 from peak_extraction import neut_loss, obtain_MS2, match_MS2
+from df_process_test import construct_df
 import pymzml
 import pyteomics.mzxml as mzxml
 import numpy as np
@@ -19,19 +20,20 @@ class PlotWindow(QtWidgets.QMainWindow):
 
         self._thread_pool = QtCore.QThreadPool()
         self._pb_list = ProgressBarsList(self)
-        self.sample_plotted_list = []
-        self.blank_plotted_list = []
+        self.mzxml_plotted_list = []
+        self.csv_plotted_list = []
         self._plotted_list = []
 
         self._feature_parameters = None
 
         self._figure = plt.figure()
-        self.fig_blank = self._figure.add_subplot(211)  # plot sample
-        self.fig_blank.ticklabel_format(axis='y', scilimits=(0, 0))
-        self.fig_sample = self._figure.add_subplot(212)  # plot blank
-        self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
-        self.fig_sample.set_xlabel('Retention time [min]')
+        self.fig_top = self._figure.add_subplot(211)  # plot sample
+        self.fig_top.ticklabel_format(axis='y', scilimits=(0, 0))
+        self.fig_bottom = self._figure.add_subplot(212)  # plot blank
+        self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))
+        self.fig_bottom.set_xlabel('Retention time [min]')
         self._figure.tight_layout()
+        # self._figure.subplots_adjust(hspace=0.0, wspace=0.0)
         self._label2line = dict()  # a label (aka line name) to plotted line
         self._canvas = FigureCanvas(self._figure)
         self._toolbar = NavigationToolbar(self._canvas, self)
@@ -53,43 +55,47 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._list_of_features.add_feature(feature)
         self._feature_parameters = parameters
 
-    # def scroll_event(self, event):  # 滚轮缩放
-    #     x_min, x_max = event.inaxes.get_xlim()
-    #     x_range = (x_max - x_min) / 10
-    #     if event.button == 'up':
-    #         event.inaxes.set(xlim=(x_min + x_range, x_max - x_range))
-    #         print('up')
-    #     elif event.button == 'down':
-    #         event.inaxes.set(xlim=(x_min - x_range, x_max + x_range))
-    #         print('down')
-    #     self._canvas.draw_idle()
+    def scroll_event(self, event):  # 滚轮缩放
+        x_min, x_max = event.inaxes.get_xlim()
+        # x_range = (x_max - x_min) / 10
+        scale_factor = 1.2
+        xdata = event.xdata
+        if event.button == 'up':
+            scale = 1 / scale_factor
+        elif event.button == 'down':
+            scale = scale_factor
+        x_lim = [xdata - (xdata - x_min) * scale, xdata + (x_max - xdata) * scale]
+        self.fig_top.set_xlim(x_lim)
+        self.fig_bottom.set_xlim(x_lim)
+        self._canvas.draw_idle()
 
     def plotter(self, obj):
         # if not self._label2line:  # in case if 'feature' was plotted
-        if obj['mode'] == 'blank':
-            self._figure.delaxes(self.fig_blank)
-            self.fig_blank = self._figure.add_subplot(211)
-            self.fig_blank.set_title('Blank')
+        if obj['mode'] == 'top':
+            self._figure.delaxes(self.fig_top)
+            self.fig_top = self._figure.add_subplot(211)
+            # self.fig_blank.set_title('Blank')
             # self.fig_blank.set_xlabel('Retention time [min]')
-            self.fig_blank.set_ylabel('Intensity')
-            self.fig_blank.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
-            line = self.fig_blank.plot(obj['x'], obj['y'], label=obj['label'])
-            self.fig_blank.legend(loc='best')
-            self.fig_blank.grid(alpha=0.8)
-        if obj['mode'] == 'sample':
-            self._figure.delaxes(self.fig_sample)
-            self.fig_sample = self._figure.add_subplot(212)
-            self.fig_sample.set_title('Sample')
-            self.fig_sample.set_xlabel('Retention time [min]')
-            self.fig_sample.set_ylabel('Intensity')
-            self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
-            line = self.fig_sample.plot(obj['x'], obj['y'], label=obj['label'])
-            self.fig_sample.legend(loc='best')
-            self.fig_sample.grid(alpha=0.8)
+            self.fig_top.set_ylabel('Intensity')
+            self.fig_top.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
+            line = self.fig_top.plot(obj['x'], obj['y'], label=obj['label'])
+            self.fig_top.legend(loc='best')
+            self.fig_top.grid(alpha=0.8)
+        if obj['mode'] == 'bottom':
+            self._figure.delaxes(self.fig_bottom)
+            self.fig_bottom = self._figure.add_subplot(212)
+            # self.fig_sample.set_title('Sample')
+            self.fig_bottom.set_xlabel('Retention time [min]')
+            self.fig_bottom.set_ylabel('Intensity')
+            self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
+            line = self.fig_bottom.plot(obj['x'], obj['y'], label=obj['label'])
+            self.fig_bottom.legend(loc='best')
+            self.fig_bottom.grid(alpha=0.8)
 
         self._label2line[obj['label']] = line[0]  # save line
         self._figure.tight_layout()
-        # self._figure.canvas.mpl_connect('scroll_event', self.scroll_event)  # 鼠标滚轮缩放画布
+        # self._figure.subplots_adjust(hspace=0.0)
+        self._figure.canvas.mpl_connect('scroll_event', self.scroll_event)  # 鼠标滚轮缩放画布
         # self._figure.canvas.mpl_connect('button_press_event', self.button_press)  # 右键清空画布
         self._canvas.draw()
 
@@ -103,23 +109,20 @@ class PlotWindow(QtWidgets.QMainWindow):
         feature = self._list_of_features.get_feature(item)
         self._label2line = dict()  # empty plotted TIC and EIC
         self._figure.clear()
-        self.fig_sample = self._figure.add_subplot(111)
-        feature.plot(self.fig_sample, shifted=shifted)
-        self.fig_sample.set_title(item.text())
-        self.fig_sample.set_xlabel('Retention time')
-        self.fig_sample.set_ylabel('Intensity')
-        self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
+        self.fig_bottom = self._figure.add_subplot(111)
+        feature.plot(self.fig_bottom, shifted=shifted)
+        self.fig_bottom.set_title(item.text())
+        self.fig_bottom.set_xlabel('Retention time')
+        self.fig_bottom.set_ylabel('Intensity')
+        self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))
         self._figure.tight_layout()
         self._canvas.draw()  # refresh canvas
 
-    def plot_tic(self, path, mode):
-        filename = os.path.basename(path)
-        label = f'{filename}'
+    def plot_tic(self, file, mode):
+        # filename = os.path.basename(path)
+        label = f'{file}'
         plotted = False
-        # if mode == 'blank':
-        #     path = self.blank_file.file2path[file]
-        # elif mode == 'sample':
-        #     path = self.sample_file.file2path[file]
+        path = self._list_of_mzxml.file2path[file]
         if label not in self._label2line:
             worker = Worker('plotting TIC...', construct_mzxml, path, label, mode)
             worker.signals.result.connect(self.plotter)
@@ -128,32 +131,47 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plotted_list.append(label)
 
             plotted = True
-        return plotted, filename  # TODO: filename还有什么用
+        return plotted, file  # TODO: filename还有什么用
+
+    def plot_processed(self, file, mode):
+        # filename = os.path.basename(path)
+        label = f'{file}'
+        plotted = False
+        path = self._list_of_processed.file2path[file]
+        if label not in self._label2line:
+            worker = Worker('Plotting TIC from csv ...', construct_df, path, label, mode)
+            worker.signals.result.connect(self.plotter)
+            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            self._thread_pool.start(worker)
+            self._plotted_list.append(label)
+
+            plotted = True
+        return plotted, file  # TODO: filename还有什么用
 
     def delete_line(self, label):
-        self.fig_sample.cla()
+        self.fig_bottom.cla()
         self._label2line.clear()
         self._plotted_list.remove(label)  # delete item from list
         self._canvas.draw_idle()
 
     def refresh_canvas(self):
         if self._label2line:
-            self.fig_blank.legend(loc='best')
-            self.fig_blank.relim()  # recompute the ax.dataLim
-            self.fig_blank.autoscale_view()  # update ax.viewLim using the new dataLim
-            self.fig_sample.legend(loc='best')
-            self.fig_sample.relim()  # recompute the ax.dataLim
-            self.fig_sample.autoscale_view()  # update ax.viewLim using the new dataLim
+            self.fig_top.legend(loc='best')
+            self.fig_top.relim()  # recompute the ax.dataLim
+            self.fig_top.autoscale_view()  # update ax.viewLim using the new dataLim
+            self.fig_bottom.legend(loc='best')
+            self.fig_bottom.relim()  # recompute the ax.dataLim
+            self.fig_bottom.autoscale_view()  # update ax.viewLim using the new dataLim
         else:
             self._figure.clear()
-            self.fig_blank = self._figure.add_subplot(211)
-            self.fig_blank.set_xlabel('Retention time [min]')
+            self.fig_top = self._figure.add_subplot(211)
+            self.fig_top.set_xlabel('Retention time [min]')
             # self.fig_blank.set_ylabel('Intensity')
-            self.fig_blank.ticklabel_format(axis='y', scilimits=(0, 0))
-            self.fig_sample = self._figure.add_subplot(212)
-            self.fig_sample.set_xlabel('Retention time [min]')
+            self.fig_top.ticklabel_format(axis='y', scilimits=(0, 0))
+            self.fig_bottom = self._figure.add_subplot(212)
+            self.fig_bottom.set_xlabel('Retention time [min]')
             # self.fig_sample.set_ylabel('Intensity')
-            self.fig_sample.ticklabel_format(axis='y', scilimits=(0, 0))
+            self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))
         self._canvas.draw()
 
 
@@ -303,7 +321,7 @@ class denoise_parawindow(QtWidgets.QDialog):
 
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
-        # self.parent.list_of_processed.addFile(name)
+        # self.parent._list_of_processed.addFile(name)
 
 
 class match_parawindow1(QtWidgets.QDialog):
@@ -460,7 +478,7 @@ class match_parawindow1(QtWidgets.QDialog):
 
     def result_to_csv(self, name, df):
         # df.to_csv(name, index=False)
-        # self.parent.list_of_processed.addFile(name)
+        # self.parent._list_of_processed.addFile(name)
         pass
 
 
@@ -610,7 +628,7 @@ class match_parawindow2(QtWidgets.QDialog):
 
     def result_to_csv(self, name, df):
         # df.to_csv(name, index=False)
-        # self.parent.list_of_processed.addFile(name)
+        # self.parent._list_of_processed.addFile(name)
         pass
 
 
@@ -652,24 +670,24 @@ class ProgressBarsList(QtWidgets.QWidget):
         self.layout().addWidget(item)
 
 
-def construct_tic(path, label, mode, progress_callback=None):
-    run = pymzml.run.Reader(path)
-    t_measure = None
-    time = []
-    tic = []
-    spectrum_count = run.get_spectrum_count()
-    for i, scan in enumerate(run):
-        if scan.ms_level == 1:
-            tic.append(scan.TIC)  # get total ion of scan
-            t, measure = scan.scan_time  # get scan time
-            time.append(t)
-            if not t_measure:
-                t_measure = measure
-            if progress_callback is not None and not i % 10:
-                progress_callback.emit(int(i * 100 / spectrum_count))
-    if t_measure == 'second':
-        time = np.array(time) / 60
-    return {'x': time, 'y': tic, 'label': label, 'mode': mode}
+# def construct_tic(path, label, mode, progress_callback=None):
+#     run = pymzml.run.Reader(path)
+#     t_measure = None
+#     time = []
+#     tic = []
+#     spectrum_count = run.get_spectrum_count()
+#     for i, scan in enumerate(run):
+#         if scan.ms_level == 1:
+#             tic.append(scan.TIC)  # get total ion of scan
+#             t, measure = scan.scan_time  # get scan time
+#             time.append(t)
+#             if not t_measure:
+#                 t_measure = measure
+#             if progress_callback is not None and not i % 10:
+#                 progress_callback.emit(int(i * 100 / spectrum_count))
+#     if t_measure == 'second':
+#         time = np.array(time) / 60
+#     return {'x': time, 'y': tic, 'label': label, 'mode': mode}
 
 
 def construct_mzxml(path, label, mode, progress_callback=None):
