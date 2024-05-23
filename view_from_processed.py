@@ -6,7 +6,7 @@ import gc
 # path = r'C:\John\DnsCl\denoise_Area.csv'
 
 
-def construct_df(file, label, mode):  # 从处理后的df中绘制TIC图
+def tic_from_csv(file, label, mode):  # 从处理后的csv中绘制TIC图
     time = []
     tic = []
     df = pd.read_csv(file)

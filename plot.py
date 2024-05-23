@@ -7,7 +7,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from utils.threading import Worker
 from background_subtract import denoise_bg
 from peak_extraction import neut_loss, obtain_MS2, match_MS2
-from df_process_test import construct_df
+from view_from_processed import tic_from_csv
 import pymzml
 import pyteomics.mzxml as mzxml
 import numpy as np
@@ -139,7 +139,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         plotted = False
         path = self._list_of_processed.file2path[file]
         if label not in self._label2line:
-            worker = Worker('Plotting TIC from csv ...', construct_df, path, label, mode)
+            worker = Worker('Plotting TIC from csv ...', tic_from_csv, path, label, mode)
             worker.signals.result.connect(self.plotter)
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
@@ -306,11 +306,11 @@ class denoise_parawindow(QtWidgets.QDialog):
             ratio = float(self.ratio.text())
             self.close()
 
-            # TODO:确认rt和mz的单位
             worker = Worker('Background subtract denoising...', denoise_bg,
                             blank, sample, mz_win*10e-7, rt_win/60, ratio)
             # worker.signals.result.connect(partial(self.result_to_csv, 'denoise_Area.csv'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+            # TODO:连接到一个特征查看窗口，选择item显示EIC
             self._thread_pool.start(worker)
         except ValueError:
             # popup window with exception

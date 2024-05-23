@@ -4,7 +4,7 @@ from plot import PlotWindow, denoise_parawindow, match_parawindow1, match_parawi
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from utils.threading import Worker
-from df_process_test import construct_df
+from view_from_processed import tic_from_csv
 from preprocess import defect_process
 
 
@@ -39,26 +39,26 @@ class MainWindow(PlotWindow):
         csv_import.triggered.connect(self._open_csv)
         file.addAction(csv_import)
 
-        file_export = QtWidgets.QMenu('Save', self)
-        # 导出当前图谱为图片
-        file_export_features_png = QtWidgets.QAction('Save current spectrogram as *.png files', self)
-        file_export_features_png.triggered.connect(partial(self._export_features, 'png'))
-        file_export.addAction(file_export_features_png)
-        # 导出当前图谱为新mzml
-        file_export_features_mzml = QtWidgets.QAction('Save current spectrogram as new *.mzxml files', self)
-        file_export_features_mzml.triggered.connect(partial(self._export_features, 'mzxml'))
-        file_export.addAction(file_export_features_mzml)
-        # 导出最终csv
-        file_export_features_csv = QtWidgets.QAction('Save current spectrogram as *.csv files', self)
-        file_export_features_csv.triggered.connect(partial(self._export_features, 'csv'))
-        file_export.addAction(file_export_features_csv)
+        # file_export = QtWidgets.QMenu('Save', self)
+        # # 导出当前图谱为图片
+        # file_export_features_png = QtWidgets.QAction('Save current spectrogram as *.png files', self)
+        # file_export_features_png.triggered.connect(partial(self._export_features, 'png'))
+        # file_export.addAction(file_export_features_png)
+        # # 导出当前图谱为新mzml
+        # file_export_features_mzml = QtWidgets.QAction('Save current spectrogram as new *.mzxml files', self)
+        # file_export_features_mzml.triggered.connect(partial(self._export_features, 'mzxml'))
+        # file_export.addAction(file_export_features_mzml)
+        # # 导出最终csv
+        # file_export_features_csv = QtWidgets.QAction('Save current spectrogram as *.csv files', self)
+        # file_export_features_csv.triggered.connect(partial(self._export_features, 'csv'))
+        # file_export.addAction(file_export_features_csv)
 
         # file_clear = QtWidgets.QMenu('Clear', self)
         # file_clear_features = QtWidgets.QAction('Clear panel with detected features', self)
         # file_clear_features.triggered.connect(self._list_of_features.clear)
         # file_clear.addAction(file_clear_features)
 
-        file.addMenu(file_export)
+        # file.addMenu(file_export)
         # file.addMenu(file_clear)
 
         # background subtraction denoise(step2&3)
@@ -585,7 +585,7 @@ class defect_parawindow(QtWidgets.QDialog):
             name, extension = os.path.splitext(file_name)
             worker = Worker('Defecting ...', defect_process, self.path, self.lower_rt, self.upper_rt,
                             self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
-            worker.signals.result.connect(partial(self.result_to_csv, name+'_defected.csv'))  # TODO:传入原始文件名
+            worker.signals.result.connect(partial(self.result_to_csv, name+'_defected.csv'))
             # worker.signals.result.connect(self.start_sample)
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
