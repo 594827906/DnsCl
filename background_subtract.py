@@ -139,7 +139,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         'scan': scan_list,
     })
     output2.to_csv('denoise_intermediate.csv', index=False)  # 用于后续处理的中间文件
-    # return output1, output2
+    return output2
 
 # read preprocessed data
 # pd.set_option('display.max_colwidth',None)  # 无法解决省略号的问题

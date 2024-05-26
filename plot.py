@@ -146,7 +146,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plotted_list.append(label)
 
             plotted = True
-        return plotted, file  # TODO: filename还有什么用
+        return plotted, file
 
     def delete_line(self, label):
         self.fig_bottom.cla()
@@ -173,155 +173,6 @@ class PlotWindow(QtWidgets.QMainWindow):
             # self.fig_sample.set_ylabel('Intensity')
             self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))
         self._canvas.draw()
-
-
-class denoise_parawindow(QtWidgets.QDialog):
-    def __init__(self, parent: PlotWindow):
-        self.parent = parent
-        super().__init__(self.parent)
-        self.setWindowTitle('Background denoise option')
-        self._thread_pool = QtCore.QThreadPool()
-
-        # 字体设置
-        font = QtGui.QFont()
-        font.setFamily('Arial')
-        font.setBold(True)
-        font.setPixelSize(15)
-        font.setWeight(75)
-
-        files_layout = QtWidgets.QVBoxLayout()
-        blank_choose_layout = QtWidgets.QHBoxLayout()
-        sample_choose_layout = QtWidgets.QHBoxLayout()
-        # 选择经过第二步处理的csv
-        choose_blank_label = QtWidgets.QLabel()
-        choose_blank_label.setText('Choose a .csv as blank:')
-        choose_blank_label.setFont(font)
-        self.blank_edit = QtWidgets.QLineEdit()
-        blank_button = QtWidgets.QToolButton()
-        blank_button.setText('...')
-        blank_button.setFont(font)
-        blank_button.clicked.connect(self.set_blank)
-
-        choose_sample_label = QtWidgets.QLabel()
-        choose_sample_label.setText('Choose a .csv as sample:')
-        choose_sample_label.setFont(font)
-        self.sample_edit = QtWidgets.QLineEdit()
-        sample_button = QtWidgets.QToolButton()
-        sample_button.setText('...')
-        sample_button.setFont(font)
-        sample_button.clicked.connect(self.set_sample)
-
-        blank_choose_layout.addWidget(self.blank_edit)
-        blank_choose_layout.addWidget(blank_button)
-        sample_choose_layout.addWidget(self.sample_edit)
-        sample_choose_layout.addWidget(sample_button)
-        files_layout.addWidget(choose_blank_label)
-        files_layout.addLayout(blank_choose_layout)
-        files_layout.addWidget(choose_sample_label)
-        files_layout.addLayout(sample_choose_layout)
-
-
-        range_setting = QtWidgets.QFormLayout()
-
-        rt_label = QtWidgets.QLabel("RT window： ±")
-        rt_label.setFont(font)
-        self.rt_window = QtWidgets.QLineEdit()
-        self.rt_window.setText('5')
-        self.rt_window.setFixedSize(50, 30)
-        self.rt_window.setFont(font)
-        rt_layout = QtWidgets.QHBoxLayout()
-        rt_text = QtWidgets.QLabel(self)
-        rt_text.setText('s')
-        rt_text.setFont(font)
-        rt_layout.addWidget(self.rt_window)
-        rt_layout.addWidget(rt_text)
-
-        mz_label = QtWidgets.QLabel("m/z window： ±")
-        mz_label.setFont(font)
-        self.mz_window = QtWidgets.QLineEdit()
-        self.mz_window.setText('10')
-        self.mz_window.setFixedSize(50, 30)
-        self.mz_window.setFont(font)
-        mz_layout = QtWidgets.QHBoxLayout()
-        mz_text1 = QtWidgets.QLabel(self)
-        mz_text1.setText('ppm')
-        mz_text1.setFont(font)
-        mz_layout.addWidget(self.mz_window)
-        mz_layout.addWidget(mz_text1)
-
-        ratio_setting = QtWidgets.QFormLayout()
-        ratio_setting.alignment()
-
-        ratio_label = QtWidgets.QLabel("Sample/Blank Ratio： ")
-        ratio_label.setFont(font)
-        self.ratio = QtWidgets.QLineEdit()
-        self.ratio.setText('10')
-        self.ratio.setFixedSize(50, 30)
-        self.ratio.setFont(font)
-        ratio_layout = QtWidgets.QHBoxLayout()
-        ratio_text = QtWidgets.QLabel(self)
-        ratio_text.setText('%')
-        ratio_text.setFont(font)
-        ratio_layout.addWidget(self.ratio)
-        ratio_layout.addWidget(ratio_text)
-        ratio_layout.addStretch()  # 什么用处？
-
-        range_setting.addRow(rt_label, rt_layout)
-        range_setting.addRow(mz_label, mz_layout)
-        # range_setting.setLabelAlignment(Q)
-
-        ratio_setting.addRow(ratio_label, ratio_layout)
-
-        ok_button = QtWidgets.QPushButton('OK')
-        ok_button.clicked.connect(self.denoise)
-        ok_button.setFont(font)
-        ok_button.resize(80, 80)  # 未生效
-
-        para_layout = QtWidgets.QVBoxLayout()
-        para_layout.addLayout(range_setting)
-        para_layout.addLayout(ratio_setting)
-        para_layout.addWidget(ok_button)
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.addLayout(files_layout)
-        layout.addLayout(para_layout)
-        self.setLayout(layout)
-
-    def set_blank(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
-        if file:
-            self.blank_edit.setText(file)
-
-    def set_sample(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
-        if file:
-            self.sample_edit.setText(file)
-
-    def denoise(self):
-        try:
-            blank = self.blank_edit.text()
-            sample = self.sample_edit.text()
-            rt_win = float(self.rt_window.text())
-            mz_win = float(self.mz_window.text())
-            ratio = float(self.ratio.text())
-            self.close()
-
-            worker = Worker('Background subtract denoising...', denoise_bg,
-                            blank, sample, mz_win*10e-7, rt_win/60, ratio)
-            # worker.signals.result.connect(partial(self.result_to_csv, 'denoise_Area.csv'))
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            # TODO:连接到一个特征查看窗口，选择item显示EIC
-            self._thread_pool.start(worker)
-        except ValueError:
-            # popup window with exception
-            msg = QtWidgets.QMessageBox(self)
-            msg.setText("Check parameters, something is wrong!")
-            msg.setIcon(QtWidgets.QMessageBox.Warning)
-            msg.exec_()
-
-    def result_to_csv(self, name, df):
-        df.to_csv(name, index=False)
-        # self.parent._list_of_processed.addFile(name)
 
 
 class match_parawindow1(QtWidgets.QDialog):
@@ -668,26 +519,6 @@ class ProgressBarsList(QtWidgets.QWidget):
 
     def addItem(self, item):
         self.layout().addWidget(item)
-
-
-# def construct_tic(path, label, mode, progress_callback=None):
-#     run = pymzml.run.Reader(path)
-#     t_measure = None
-#     time = []
-#     tic = []
-#     spectrum_count = run.get_spectrum_count()
-#     for i, scan in enumerate(run):
-#         if scan.ms_level == 1:
-#             tic.append(scan.TIC)  # get total ion of scan
-#             t, measure = scan.scan_time  # get scan time
-#             time.append(t)
-#             if not t_measure:
-#                 t_measure = measure
-#             if progress_callback is not None and not i % 10:
-#                 progress_callback.emit(int(i * 100 / spectrum_count))
-#     if t_measure == 'second':
-#         time = np.array(time) / 60
-#     return {'x': time, 'y': tic, 'label': label, 'mode': mode}
 
 
 def construct_mzxml(path, label, mode, progress_callback=None):
