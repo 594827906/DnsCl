@@ -1,6 +1,3 @@
-import os
-import json
-import pymzml
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,10 +22,14 @@ class eic_window(QtWidgets.QDialog):
         self.canvas = FigureCanvas(self.figure)
 
         self.feature_list = ClickableListWidget()
+        self.feature_list = QtWidgets.QTableWidget(self)
+        self.feature_list.setRowCount(len(self.df) + 1)  # 包括列名行
+        self.feature_list.setColumnCount(len(self.df.columns))
+        self.feature_list.setHorizontalHeaderLabels(self.df.columns)
         self.add_dataframe_to_listwidget(df)
 
         # self.feature_list.connectRightClick(self.file_right_click)
-        self.feature_list.connectDoubleClick(self.file_double_click)
+        # self.feature_list.connectDoubleClick(self.file_double_click)
         self._init_ui()  # initialize user interface
 
         # self.plot_current()  # initial plot
@@ -58,13 +59,10 @@ class eic_window(QtWidgets.QDialog):
         widget_feature = QtWidgets.QWidget()
         feature_label = QtWidgets.QLabel('Feature list：')
         feature_label.setFont(font)
-        next_button = QtWidgets.QPushButton('Next')
-        next_button.setFont(font)
-        next_button.clicked.connect(self.next)
         feature_list_layout = QtWidgets.QVBoxLayout(widget_feature)
         feature_list_layout.addWidget(feature_label)
         feature_list_layout.addWidget(self.feature_list)
-        feature_list_layout.addWidget(next_button)
+        self.feature_list.cellDoubleClicked.connect(self.plot_chosen)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         splitter.addWidget(widget_canvas)
@@ -105,23 +103,17 @@ class eic_window(QtWidgets.QDialog):
                     max_width = item_width
             col_widths.append(max_width)
 
+        # 添加 DataFrame 列名到 QTableWidget 的第一行
+        for col_index, col_name in enumerate(self.df.columns):
+            item = QtWidgets.QTableWidgetItem(col_name)
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable & ~QtCore.Qt.ItemIsSelectable)  # 设为不可编辑和选择
+            self.feature_list.setItem(0, col_index, item)
+
         # 将 DataFrame 的每一行添加到 QListWidget
-        for index, row in dataframe.iterrows():
-            item_texts = []
-            for i, item in enumerate(row):
-                item_text = str(item).ljust(col_widths[i] // font_metrics.averageCharWidth() + 2)
-                item_texts.append(item_text)
-            item_text = ', '.join(item_texts)
-            # list_item = QtWidgets.QListWidgetItem(item_text)
-            self.feature_list.addItem(f"{index}: {item_text}")
-
-    # Auxiliary methods
-    def file_right_click(self):
-        FileContextMenu(self)
-
-    def file_double_click(self, item):
-        self.item = item
-        self.plot_chosen()
+        for row_index, row in self.df.iterrows():
+            for col_index, value in enumerate(row):
+                item = QtWidgets.QTableWidgetItem(str(value))
+                self.feature_list.setItem(row_index, col_index, item)
 
     def get_chosen(self):
         chosen_item = None
@@ -129,90 +121,38 @@ class eic_window(QtWidgets.QDialog):
             chosen_item = item
         return chosen_item
 
-    def next(self):
-        if self.current_flag:
-            self.current_flag = False
-            self.plot_current()
+    def plot_chosen(self, row, column):  # TODO: debugging...
+        # 获取对应的 DataFrame 行数据
+        row_data = self.df.iloc[row]
+
+        mz = row_data['mz']
+        inten_sam = row_data['intensity (Sample)']
+        inten_blk = row_data['intensity (Blank)']
+        RT = row_data['RT']
+        RT_min = RT[0]
+        RT_max = RT[-1]
+        scan = row_data['scan']
+        eic_len = len(scan)
+        ext_blk = []
+        if isinstance(inten_blk, int):
+            for _ in range(eic_len):
+                ext_blk.append(0)
         else:
-            self.item.setSelected(False)
-            index = min(self.feature_list.row(self.item) + 1, self.feature_list.count() - 1)
-            self.item = self.feature_list.item(index)
-            self.item.setSelected(True)
-            self.plot_chosen()
+            ext_blk = inten_blk
+        print(inten_blk)
 
-    # def press_plot_chosen(self):
-    #     try:
-    #         self.plotted_item = self.get_chosen()
-    #         if self.plotted_item is None:
-    #             raise ValueError
-    #         self.plot_chosen()
-    #     except ValueError:
-    #         # popup window with exception
-    #         msg = QtWidgets.QMessageBox(self)
-    #         msg.setText('Choose a ROI to plot from the list!')
-    #         msg.setIcon(QtWidgets.QMessageBox.Warning)
-    #         msg.exec_()
-
-    # Visualization
-    # def plot_current(self):
-    #     try:
-    #         if not self.current_flag:
-    #             self.current_flag = True
-    #             self.current_description = self.description
-    #             self.plotted_roi = self.ROIs[self.file_suffix]
-    #             filename = f'{self.file_prefix}_{self.file_suffix}.json'
-    #             self.plotted_path = os.path.join(self.folder, filename)
-    #
-    #             self.figure.clear()
-    #             ax = self.figure.add_subplot(111)
-    #             ax.plot(self.plotted_roi.i, label=filename)
-    #             title = f'mz = {self.plotted_roi.mzmean:.3f}, ' \
-    #                     f'rt = {self.plotted_roi.rt[0]:.1f} - {self.plotted_roi.rt[1]:.1f}'
-    #             ax.legend(loc='best')
-    #             ax.set_title(title)
-    #             self.canvas.draw()  # refresh canvas
-    #     except IndexError:
-    #         msg = QtWidgets.QMessageBox(self)
-    #         msg.setText('已标注完所有ROI')
-    #         msg.setIcon(QtWidgets.QMessageBox.Warning)
-    #         msg.exec_()
-
-    def plot_chosen(self):  # TODO: debugging...
-        item_text = self.item.text()
-        row_index = int(item_text.split(':')[0])
-        row_data = self.df.iloc[row_index]
-        if not row_data.empty:
-            row_str = '\n'.join([f'{col}: {row_data[col]}' for col in row_data.index])
-            print(row_str)
-        else:
-            print('empty')
-
-        # self.plotted_eic = eic_from_csv(filename, filename, 'plotting EIC...')
-        # self.figure.clear()
-        # ax = self.figure.add_subplot(111)
-        # ax.plot(self.plotted_eic.i, label=filename)
-        # title = f'mz = {self.plotted_eic.mzmean:.3f}, ' \
-        #         f'rt = {self.plotted_eic.rt[0]:.1f} - {self.plotted_eic.rt[1]:.1f}'
-        #
-        # ax.set_title(title)
-        # ax.legend(loc='best')
-        # self.canvas.draw()
-        # self.current_flag = False
-
-    # def plot_preview(self, borders):
-    #     filename = os.path.basename(self.plotted_path)
-    #     self.figure.clear()
-    #     ax = self.figure.add_subplot(111)
-    #     ax.plot(self.plotted_roi.i, label=filename)
-    #     title = f'mz = {self.plotted_roi.mzmean:.3f}, ' \
-    #             f'rt = {self.plotted_roi.rt[0]:.1f} - {self.plotted_roi.rt[1]:.1f}'
-    #
-    #     for border in borders:
-    #         begin, end = border
-    #         ax.fill_between(range(begin, end + 1), self.plotted_roi.i[begin:end + 1], alpha=0.5)
-    #     ax.set_title(title)
-    #     ax.legend(loc='best')
-    #     self.canvas.draw()  # refresh canvas
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.set_ylabel('Intensity')
+        ax.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
+        ax.plot(scan, inten_sam, color='darkorange', label='sample')
+        ax.plot(scan, ext_blk, color='royalblue', label='blank')
+        title = f'mz = {mz:.3f}, rt = {RT_min:.1f} - {RT_max:.1f}'
+        ax.set_title(title)
+        ax.legend(loc='best')
+        ax.grid(alpha=0.8)
+        self.canvas.draw()
+        self.current_flag = False
 
 
 class FileContextMenu(QtWidgets.QMenu):

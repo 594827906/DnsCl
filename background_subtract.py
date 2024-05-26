@@ -66,9 +66,8 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
                 plab_matched.append(num_peak)
 
         else:  # if match
-
-            ind_all = np.where((mass_blk_uni >= lower_bound) & (mass_blk_uni <= upper_bound))[
-                0]  # ind possibly exist 2 values
+            # ind possibly exist 2 values
+            ind_all = np.where((mass_blk_uni >= lower_bound) & (mass_blk_uni <= upper_bound))[0]
             for j in range(len(mass_blk_uni[ind_all])):
 
                 ind_of_blank = np.where(mass_blk == mass_blk_uni[ind_all][j])
