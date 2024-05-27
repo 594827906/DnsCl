@@ -90,7 +90,7 @@ def bin_peaks(input_df, tol=10e-6):
     n = len(mass)
     # calculate difference
     d_mass = np.diff(mass)
-    # dev = d_mass/mass[:-1]  # devation from previous mass
+    # dev = d_mass/mass[:-1]  # deviation from previous mass
 
     # Initialization
     n_boundaries = max(1000, np.floor(3 * np.log(n)))

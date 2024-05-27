@@ -297,7 +297,7 @@ class match_parawindow1(QtWidgets.QDialog):
 
             # TODO:确认rt和mz的单位
             worker = Worker('Neutral loss matching...', neut_loss, path, nl, mz_win*10e-7, rt_win/60)
-            worker.signals.result.connect(partial(self.result_to_csv, 'NL.csv'))  # TODO:list转表格？
+            worker.signals.result.connect(partial(self.save_as_txt, 'NL.txt'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
         except ValueError:
@@ -317,7 +317,7 @@ class match_parawindow1(QtWidgets.QDialog):
 
             # TODO:确认rt和mz的单位
             worker = Worker('Isotope feature matching...', neut_loss, path, nl, mz_win*10e-7, rt_win/60)
-            worker.signals.result.connect(partial(self.result_to_csv, 'isotope.csv'))  # TODO:list转表格？
+            worker.signals.result.connect(partial(self.save_as_txt, 'isotope.txt'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
         except ValueError:
@@ -327,10 +327,13 @@ class match_parawindow1(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def result_to_csv(self, name, df):
-        # df.to_csv(name, index=False)
-        # self.parent._list_of_processed.addFile(name)
-        pass
+    def save_as_txt(self, filename, arr):
+        with open(filename, 'w') as file:
+            for item in arr:
+                file.write(f"{item}\n")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + filename + " successfully!")
+        msg.exec_()
 
 
 class match_parawindow2(QtWidgets.QDialog):
@@ -341,17 +344,17 @@ class match_parawindow2(QtWidgets.QDialog):
         self._thread_pool = QtCore.QThreadPool()
 
         # 字体设置
-        font_title = QtGui.QFont()
-        font_title.setFamily('Arial')
-        font_title.setBold(True)
-        font_title.setPixelSize(15)
-        font_title.setWeight(75)
+        self.font_title = QtGui.QFont()
+        self.font_title.setFamily('Arial')
+        self.font_title.setBold(True)
+        self.font_title.setPixelSize(15)
+        self.font_title.setWeight(75)
 
-        font_input = QtGui.QFont()
-        font_input.setFamily('Calibri')
-        font_input.setBold(True)
-        font_input.setPixelSize(15)
-        font_input.setWeight(75)
+        self.font_input = QtGui.QFont()
+        self.font_input.setFamily('Calibri')
+        self.font_input.setBold(True)
+        self.font_input.setPixelSize(15)
+        self.font_input.setWeight(75)
 
         files_layout = QtWidgets.QVBoxLayout()
         mzxml_choose_layout = QtWidgets.QHBoxLayout()
@@ -360,23 +363,23 @@ class match_parawindow2(QtWidgets.QDialog):
         # 选择原始mzxml以获得二级谱
         choose_mzxml_label = QtWidgets.QLabel()
         choose_mzxml_label.setText('Choose a *.mzxml to obtain MS2 data:')
-        choose_mzxml_label.setFont(font_title)
+        choose_mzxml_label.setFont(self.font_title)
         self.mzxml_edit = QtWidgets.QLineEdit()
-        self.mzxml_edit.setFont(font_input)
+        self.mzxml_edit.setFont(self.font_input)
         mzxml_button = QtWidgets.QToolButton()
         mzxml_button.setText('...')
-        mzxml_button.setFont(font_title)
+        mzxml_button.setFont(self.font_title)
         mzxml_button.clicked.connect(self.set_mzxml)
 
         # 选择经过第三步处理的csv
         choose_subtracted_label = QtWidgets.QLabel()
         choose_subtracted_label.setText('Choose a *.csv that have been subtracted:')
-        choose_subtracted_label.setFont(font_title)
+        choose_subtracted_label.setFont(self.font_title)
         self.subtracted_edit = QtWidgets.QLineEdit()
-        self.subtracted_edit.setFont(font_input)
+        self.subtracted_edit.setFont(self.font_input)
         subtracted_button = QtWidgets.QToolButton()
         subtracted_button.setText('...')
-        subtracted_button.setFont(font_title)
+        subtracted_button.setFont(self.font_title)
         subtracted_button.clicked.connect(self.set_subtracted)
 
         mzxml_choose_layout.addWidget(self.mzxml_edit)
@@ -393,58 +396,64 @@ class match_parawindow2(QtWidgets.QDialog):
         fragment_setting = QtWidgets.QFormLayout()
         fragment_setting.alignment()
 
-        fragment_label = QtWidgets.QLabel("Fragment m/z: ")
-        fragment_label.setFont(font_title)
+        fragment_label = QtWidgets.QLabel("Fragment m/z: (Choose to contain ALL or ONE of the fragment m/z)")
+        fragment_label.setFont(self.font_title)
+
+        self.logic_choose = QtWidgets.QComboBox()
+        self.logic_choose.addItems(["- - - - -", "all of them", "one of them"])
+        self.logic_choose.setFont(self.font_input)
+
         self.fragment_set = QtWidgets.QLineEdit()
         self.fragment_set.setText('156.08153,171.10425')
-        self.fragment_set.setFixedSize(150, 30)
-        self.fragment_set.setFont(font_input)
+        # self.fragment_set.setFixedSize(150, 30)
+        self.fragment_set.setFont(self.font_input)
         fragment_layout = QtWidgets.QHBoxLayout()
         fragment_text = QtWidgets.QLabel(self)
         fragment_text.setText('Da')
-        fragment_text.setFont(font_title)
+        fragment_text.setFont(self.font_title)
+        fragment_layout.addWidget(self.logic_choose)
         fragment_layout.addWidget(self.fragment_set)
         fragment_layout.addWidget(fragment_text)
         fragment_layout.addStretch()
-        # TODO: 增加和/或选择
-        format_label = QtWidgets.QLabel("You can enter multiple fragment m/z values and separate by commas.\n"
-                                        "e.g. 156.08153,171.10425")
-        format_label.setFont(font_input)
+        format_label = QtWidgets.QLabel("* You can enter multiple fragment m/z values and separate by commas.\n"
+                                        "  e.g. 156.08153,171.10425")
+        format_label.setFont(self.font_input)
 
         rt_label = QtWidgets.QLabel("RT tolerance: ±")
-        rt_label.setFont(font_title)
+        rt_label.setFont(self.font_title)
         self.rt_window = QtWidgets.QLineEdit()
         self.rt_window.setText('30')
         self.rt_window.setFixedSize(50, 30)
-        self.rt_window.setFont(font_input)
+        self.rt_window.setFont(self.font_input)
         rt_layout = QtWidgets.QHBoxLayout()
         rt_text = QtWidgets.QLabel(self)
         rt_text.setText('s')
-        rt_text.setFont(font_title)
+        rt_text.setFont(self.font_title)
         rt_layout.addWidget(self.rt_window)
         rt_layout.addWidget(rt_text)
 
         mz_label = QtWidgets.QLabel("m/z tolerance: ±")
-        mz_label.setFont(font_title)
+        mz_label.setFont(self.font_title)
         self.mz_window = QtWidgets.QLineEdit()
         self.mz_window.setText('10')
         self.mz_window.setFixedSize(50, 30)
-        self.mz_window.setFont(font_input)
+        self.mz_window.setFont(self.font_input)
         mz_layout = QtWidgets.QHBoxLayout()
         mz_text = QtWidgets.QLabel(self)
         mz_text.setText('ppm')
-        mz_text.setFont(font_title)
+        mz_text.setFont(self.font_title)
         mz_layout.addWidget(self.mz_window)
         mz_layout.addWidget(mz_text)
 
-        fragment_setting.addRow(fragment_label, fragment_layout)
+        fragment_setting.addRow(fragment_label)
+        fragment_setting.addRow(fragment_layout)
         range_setting.addRow(rt_label, rt_layout)
         range_setting.addRow(mz_label, mz_layout)
         # range_setting.setLabelAlignment(Q)
 
         ok_button = QtWidgets.QPushButton('OK')
         ok_button.clicked.connect(self.fragment)
-        ok_button.setFont(font_title)
+        ok_button.setFont(self.font_title)
         ok_button.resize(80, 80)  # 未生效
 
         para_layout = QtWidgets.QVBoxLayout()
@@ -470,18 +479,31 @@ class match_parawindow2(QtWidgets.QDialog):
 
     def fragment(self):
         try:
+            mode = self.logic_choose.currentText()
             path1 = self.mzxml_edit.text()
             path2 = self.subtracted_edit.text()
             fragment = self.fragment_set.text()
             rt_win = float(self.rt_window.text())
             mz_win = float(self.mz_window.text())
-            self.close()
 
-            # TODO:结果为list，如何保存
-            worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-            worker.signals.result.connect(partial(match_MS2, path2))
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            self._thread_pool.start(worker)
+            if mode == 'all of them':
+                self.close()
+                worker = Worker('Fragment feature matching...', obtain_MS2, path1)
+                worker.signals.result.connect(partial(match_MS2, path2, mz_win*10e-7, rt_win/60))  # TODO:连接and函数
+                worker.signals.close_signal.connect(worker.progress_dialog.close)
+                self._thread_pool.start(worker)
+            elif mode == 'one of them':
+                self.close()
+                worker = Worker('Fragment feature matching...', obtain_MS2, path1)
+                worker.signals.result.connect(partial(match_MS2, path2, mz_win*10e-7, rt_win/60))  # TODO:连接or函数
+                worker.signals.close_signal.connect(worker.progress_dialog.close)
+                self._thread_pool.start(worker)
+            else:
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Choose to contain ALL or ONE of the fragment m/z values")
+                msg.setFont(self.font_input)
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
         except ValueError:
             # popup window with exception
             msg = QtWidgets.QMessageBox(self)

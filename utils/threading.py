@@ -10,7 +10,7 @@ class WorkerSignals(QtCore.QObject):
     finished : QtCore.pyqtSignal
         No data
     error : QtCore.pyqtSignal
-        `tuple` (exctype, value, traceback.format_exc() )
+        `tuple` (exc type, value, traceback.format_exc() )
     result : QtCore.pyqtSignal
         `object` data returned from processing, anything
     progress : QtCore.pyqtSignal
@@ -41,14 +41,6 @@ class Worker(QtCore.QRunnable):
     ----------
     mode : str
         A one of two 'all in one' of 'sequential'
-    model : nn.Module
-        an ANN model if mode is 'all in one' (optional)
-    classifier : nn.Module
-        an ANN model for classification (optional)
-    segmentator : nn.Module
-        an ANN model for segmentation (optional)
-    peak_minimum_points : int
-        minimum peak length in points
 
     """
     def __init__(self, mode, function, *args, multiple_process=False, **kwargs):

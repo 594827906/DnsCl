@@ -62,7 +62,7 @@ class eic_window(QtWidgets.QDialog):
         feature_list_layout = QtWidgets.QVBoxLayout(widget_feature)
         feature_list_layout.addWidget(feature_label)
         feature_list_layout.addWidget(self.feature_list)
-        self.feature_list.cellDoubleClicked.connect(self.plot_chosen)
+        self.feature_list.cellClicked.connect(self.plot_chosen)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         splitter.addWidget(widget_canvas)
@@ -104,15 +104,16 @@ class eic_window(QtWidgets.QDialog):
             col_widths.append(max_width)
 
         # 添加 DataFrame 列名到 QTableWidget 的第一行
-        for col_index, col_name in enumerate(self.df.columns):
-            item = QtWidgets.QTableWidgetItem(col_name)
-            item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable & ~QtCore.Qt.ItemIsSelectable)  # 设为不可编辑和选择
-            self.feature_list.setItem(0, col_index, item)
+        # for col_index, col_name in enumerate(self.df.columns):
+        #     item = QtWidgets.QTableWidgetItem(col_name)
+        #     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable & ~QtCore.Qt.ItemIsSelectable)  # 设为不可编辑和选择
+        #     self.feature_list.setItem(0, col_index, item)
 
-        # 将 DataFrame 的每一行添加到 QListWidget
+        # 将 DataFrame 的每一行添加到 QTableWidget
         for row_index, row in self.df.iterrows():
             for col_index, value in enumerate(row):
                 item = QtWidgets.QTableWidgetItem(str(value))
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)  # 设为不可编辑
                 self.feature_list.setItem(row_index, col_index, item)
 
     def get_chosen(self):
@@ -121,7 +122,7 @@ class eic_window(QtWidgets.QDialog):
             chosen_item = item
         return chosen_item
 
-    def plot_chosen(self, row, column):  # TODO: debugging...
+    def plot_chosen(self, row, column):
         # 获取对应的 DataFrame 行数据
         row_data = self.df.iloc[row]
 
@@ -137,9 +138,35 @@ class eic_window(QtWidgets.QDialog):
         if isinstance(inten_blk, int):
             for _ in range(eic_len):
                 ext_blk.append(0)
+        elif len(inten_blk) < eic_len:
+            max_pos_eic = np.argmax(inten_sam)
+            max_pos_blk = np.argmax(inten_blk)
+
+            # 计算位置偏移量
+            offset = max_pos_blk - max_pos_eic
+
+            # 创建新的数组，并初始化为零
+            ext_blk = np.zeros(eic_len, dtype=max_pos_blk.dtype)
+
+            if offset >= 0:
+                if len(inten_blk) + abs(offset) <= eic_len:
+                    ext_blk[:len(inten_blk)] = inten_blk
+                else:
+                    if max_pos_eic >= eic_len // 2:
+                        ext_blk[eic_len - len(inten_blk):] = inten_blk
+                    else:
+                        ext_blk[:eic_len - len(inten_blk)] = inten_blk
+            else:
+                if len(inten_blk) + abs(offset) <= eic_len:
+                    ext_blk[-offset:-offset + len(inten_blk)] = inten_blk
+                else:
+                    if max_pos_eic >= eic_len // 2:
+                        ext_blk[eic_len - len(inten_blk):] = inten_blk
+                    else:
+                        ext_blk[:eic_len - len(inten_blk)] = inten_blk
         else:
             ext_blk = inten_blk
-        print(inten_blk)
+        print(ext_blk)
 
         self.figure.clear()
         ax = self.figure.add_subplot(111)

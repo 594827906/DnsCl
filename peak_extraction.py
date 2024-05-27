@@ -12,7 +12,7 @@ import pyteomics.mzxml as mzxml
 '''
 
 
-##------------function for checking neutral loss-----------------------#
+# ------------function for checking neutral loss----------------------- #
 def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
     input_df = pd.read_csv(file)
 
@@ -61,7 +61,7 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
     return matchmz
 
 
-##-------------------prepare for plot MS/MS-----------------------#
+# -------------------prepare for plot MS/MS----------------------- #
 def obtain_MS2(mzXML_file):
     run = mzxml.read(mzXML_file)
     RT = []
@@ -90,7 +90,7 @@ def obtain_MS2(mzXML_file):
     return output
 
 
-##----------------------  function for  MS/MS matching-----------------------#
+# ----------------------  function for  MS/MS matching----------------------- #
 def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=156.08153):
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
