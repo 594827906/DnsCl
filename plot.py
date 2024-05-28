@@ -485,17 +485,23 @@ class match_parawindow2(QtWidgets.QDialog):
             fragment = self.fragment_set.text()
             rt_win = float(self.rt_window.text())
             mz_win = float(self.mz_window.text())
+            print(fragment)
+            values = fragment.split(',')
+            tar1 = float(values[0])
+            tar2 = float(values[1])
 
             if mode == 'all of them':
                 self.close()
                 worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-                worker.signals.result.connect(partial(match_MS2, path2, mz_win*10e-7, rt_win/60))  # TODO:连接and函数
+                worker.signals.result.connect(partial(self.all, path2, tol_mz=mz_win*10e-7, tol_rt=rt_win/60,
+                                                      tar1=tar1, tar2=tar2))
                 worker.signals.close_signal.connect(worker.progress_dialog.close)
                 self._thread_pool.start(worker)
             elif mode == 'one of them':
                 self.close()
                 worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-                worker.signals.result.connect(partial(match_MS2, path2, mz_win*10e-7, rt_win/60))  # TODO:连接or函数
+                worker.signals.result.connect(partial(self.one, path2, tol_mz=mz_win*10e-7, tol_rt=rt_win/60,
+                                                      tar1=tar1, tar2=tar2))
                 worker.signals.close_signal.connect(worker.progress_dialog.close)
                 self._thread_pool.start(worker)
             else:
@@ -508,13 +514,35 @@ class match_parawindow2(QtWidgets.QDialog):
             # popup window with exception
             msg = QtWidgets.QMessageBox(self)
             msg.setText("Check parameters, something is wrong!")
+            msg.setFont(self.font_input)
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def result_to_csv(self, name, df):
-        # df.to_csv(name, index=False)
-        # self.parent._list_of_processed.addFile(name)
-        pass
+    def all(self, result, path2, tol_mz, tol_rt, tar1, tar2):
+        # 启动第二个后台任务处理 obtain_MS2 的结果
+        worker2 = Worker('Fragment feature matching...', match_MS2, result, path2, tol_mz=tol_mz,
+                         tol_rt=tol_rt, tar1=tar1, tar2=tar2)
+        # 链接逻辑all函数
+        worker2.signals.result.connect(partial(self.save_as_txt, 'fragment_all.txt'))
+        worker2.signals.close_signal.connect(worker2.progress_dialog.close)
+        self._thread_pool.start(worker2)
+
+    def one(self, result, path2, tol_mz, tol_rt, tar1, tar2):
+        # 启动第二个后台任务处理 obtain_MS2 的结果
+        worker2 = Worker('Fragment feature matching...', match_MS2, result, path2, tol_mz=tol_mz,
+                         tol_rt=tol_rt, tar1=tar1, tar2=tar2)
+        # 连接逻辑or函数
+        worker2.signals.result.connect(partial(self.save_as_txt, 'fragment_one.txt'))
+        worker2.signals.close_signal.connect(worker2.progress_dialog.close)
+        self._thread_pool.start(worker2)
+
+    def save_as_txt(self, filename, arr):
+        with open(filename, 'w') as file:
+            for item in arr:
+                file.write(f"{item}\n")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + filename + " successfully!")
+        msg.exec_()
 
 
 class ProgressBarsListItem(QtWidgets.QWidget):

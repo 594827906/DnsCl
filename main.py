@@ -85,7 +85,7 @@ class MainWindow(PlotWindow):
         nl_identify.triggered.connect(self.nl)
         fragment_identify = QtWidgets.QAction('Feature fragment recognition', self)
         fragment_identify.triggered.connect(self.fragment)
-        isotope_differential = QtWidgets.QAction('同位素特征m/z差值', self)
+        isotope_differential = QtWidgets.QAction('Isotope differential m/z value', self)
         isotope_differential.triggered.connect(self.isotope)
         matching.addAction(nl_identify)
         matching.addAction(fragment_identify)

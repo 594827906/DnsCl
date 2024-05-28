@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5 import QtWidgets, QtGui, QtCore
@@ -166,7 +167,7 @@ class eic_window(QtWidgets.QDialog):
                         ext_blk[:eic_len - len(inten_blk)] = inten_blk
         else:
             ext_blk = inten_blk
-        print(ext_blk)
+        # print(ext_blk)
 
         self.figure.clear()
         ax = self.figure.add_subplot(111)
@@ -174,6 +175,7 @@ class eic_window(QtWidgets.QDialog):
         ax.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
         ax.plot(scan, inten_sam, color='darkorange', label='sample')
         ax.plot(scan, ext_blk, color='royalblue', label='blank')
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # x轴只显示整数
         title = f'mz = {mz:.3f}, rt = {RT_min:.1f} - {RT_max:.1f}'
         ax.set_title(title)
         ax.legend(loc='best')
