@@ -149,10 +149,12 @@ class PlotWindow(QtWidgets.QMainWindow):
         return plotted, file
 
     def delete_line(self, label):
-        self.fig_bottom.cla()
-        self._label2line.clear()
-        self._plotted_list.remove(label)  # delete item from list
-        self._canvas.draw_idle()
+        try:
+            self._label2line.clear()
+            self._plotted_list.remove(label)  # delete item from list
+            self._canvas.draw_idle()
+        except ValueError:
+            pass
 
     def refresh_canvas(self):
         if self._label2line:
