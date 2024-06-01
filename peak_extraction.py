@@ -91,7 +91,70 @@ def obtain_MS2(mzXML_file):
 
 
 # ----------------------  function for  MS/MS matching----------------------- #
-def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=156.08153):
+def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与逻辑
+    values_str = fragments.split(',')
+    values = [float(num) for num in values_str]
+    ind_list = []
+    mz_tar_list = []
+    mz_tar_tensor = []
+    rt_tar_list = []
+    rt_tar_tensor = []
+    mz_list = []
+    rt_list = []
+    input_df = pd.read_csv(rawdata)
+    new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
+    new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
+    new_ms2 = pd.concat([new_left, new_right], axis=1)
+    new_ms2.columns = ['RT', 'intensity', 'MS2mz', 'precusormz']
+
+    ms2mz = np.array(new_ms2['MS2mz'])
+
+    # 查找目标片段并记录相应的 precusormz
+    for target in values:
+        index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]  # 提取第一个tar的indexlist
+        for ind in index:
+            mz_tar_list.append(new_ms2.loc[ind, 'precusormz'])
+            rt_tar_list.append(new_ms2.loc[ind, 'RT'])
+        mz_tar_tensor.append(mz_tar_list)
+        rt_tar_tensor.append(rt_tar_list)
+        mz_tar_list = []
+        rt_list = []
+
+    num_rows = len(mz_tar_tensor)
+    len_first_row = len(mz_tar_tensor[0])
+
+    # 遍历第一行中的元素，并检查其余行是否都有
+    for ind in range(len_first_row):
+        element = mz_tar_tensor[0][ind]
+        # 检查该元素是否在所有其他行中都存在
+        if all(element in mz_tar_tensor[row] for row in range(1, num_rows)):
+            # 记录该元素及其在第一行中的索引
+            mz_list.append(element)
+            rt_list.append(rt_tar_tensor[0][ind])
+
+    # 获得 input_df 中的 mz, RT 和 intensity
+    mz_den = np.array(input_df['mz'])
+    rt_den = np.array(input_df['RT'])
+    intensity_den = np.array(input_df['intensity (Sample)'])
+    match_mz = []
+    for i in np.arange(len(mz_list)):
+        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)
+        if np.size(ind) >= 1:
+            for p in np.arange(len(ind)):
+                temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
+                max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
+
+                if np.abs(max_rt - rt_list[i]) <= tol_rt:
+                    match_mz.append(mz_den[ind][p])
+
+    return match_mz
+
+
+def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或逻辑
+    values_str = fragments.split(',')
+    values = [float(num) for num in values_str]
+    ind_list = []
+    all_tar = set()
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
@@ -101,10 +164,14 @@ def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=
     ms2mz = np.array(new_ms2['MS2mz'])
     precusormz = np.array(new_ms2['precusormz'])
 
-    ind1 = np.where(np.abs(ms2mz-tar1)/tar1 < tol_mz)[0]
-    ind2 = np.where(np.abs(ms2mz-tar2)/tar2 < tol_mz)[0]
+    for target in values:
+        index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]
+        ind_list.append(index)
 
-    exist_precmz = np.unique(np.union1d(precusormz[ind1], precusormz[ind2]))
+    for ind in ind_list:
+        all_tar.update(precusormz[ind])
+
+    exist_precmz = list(all_tar)
     mz_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['precusormz'])
     rt_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['RT'])
 
@@ -113,15 +180,13 @@ def match_MS2(rawdata, ms2_df, tol_mz=10e-6, tol_rt=30/60, tar1=171.10425, tar2=
     intensity_den = np.array(input_df['intensity (Sample)'])
     match_mz = []
     for i in np.arange(len(mz_list)):
-
         ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)
         if np.size(ind) >= 1:
-            # print(ind)
             for p in np.arange(len(ind)):
                 temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
                 max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
 
-                if np.abs(max_rt-rt_list[i]) <= tol_rt:
+                if np.abs(max_rt - rt_list[i]) <= tol_rt:
                     match_mz.append(mz_den[ind][p])
 
     return match_mz

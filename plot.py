@@ -6,7 +6,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
 from background_subtract import denoise_bg
-from peak_extraction import neut_loss, obtain_MS2, match_MS2
+from peak_extraction import neut_loss, obtain_MS2, match_all_MS2, match_one_MS2
 from view_from_processed import tic_from_csv
 import pymzml
 import pyteomics.mzxml as mzxml
@@ -486,22 +486,20 @@ class match_parawindow2(QtWidgets.QDialog):
             rt_win = float(self.rt_window.text())
             mz_win = float(self.mz_window.text())
             print(fragment)
-            values = fragment.split(',')
-            tar1 = float(values[0])
-            tar2 = float(values[1])
+            # values = fragment.split(',')
+            # tar1 = float(values[0])
+            # tar2 = float(values[1])
 
             if mode == 'all of them':
                 self.close()
                 worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-                worker.signals.result.connect(partial(self.all, path2, tol_mz=mz_win*10e-7, tol_rt=rt_win/60,
-                                                      tar1=tar1, tar2=tar2))
+                worker.signals.result.connect(partial(self.all, path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
                 worker.signals.close_signal.connect(worker.progress_dialog.close)
                 self._thread_pool.start(worker)
             elif mode == 'one of them':
                 self.close()
                 worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-                worker.signals.result.connect(partial(self.one, path2, tol_mz=mz_win*10e-7, tol_rt=rt_win/60,
-                                                      tar1=tar1, tar2=tar2))
+                worker.signals.result.connect(partial(self.one, path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
                 worker.signals.close_signal.connect(worker.progress_dialog.close)
                 self._thread_pool.start(worker)
             else:
@@ -518,19 +516,17 @@ class match_parawindow2(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
-    def all(self, result, path2, tol_mz, tol_rt, tar1, tar2):
+    def all(self, result, path2, fragments, tol_mz, tol_rt):
         # 启动第二个后台任务处理 obtain_MS2 的结果
-        worker2 = Worker('Fragment feature matching...', match_MS2, result, path2, tol_mz=tol_mz,
-                         tol_rt=tol_rt, tar1=tar1, tar2=tar2)
+        worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 链接逻辑all函数
         worker2.signals.result.connect(partial(self.save_as_txt, 'fragment_all.txt'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
-    def one(self, result, path2, tol_mz, tol_rt, tar1, tar2):
+    def one(self, result, path2, fragments, tol_mz, tol_rt):
         # 启动第二个后台任务处理 obtain_MS2 的结果
-        worker2 = Worker('Fragment feature matching...', match_MS2, result, path2, tol_mz=tol_mz,
-                         tol_rt=tol_rt, tar1=tar1, tar2=tar2)
+        worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 连接逻辑or函数
         worker2.signals.result.connect(partial(self.save_as_txt, 'fragment_one.txt'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
