@@ -8,7 +8,6 @@ from utils.threading import Worker
 from background_subtract import denoise_bg
 from peak_extraction import neut_loss, obtain_MS2, match_all_MS2, match_one_MS2
 from view_from_processed import tic_from_csv
-import pymzml
 import pyteomics.mzxml as mzxml
 import numpy as np
 import os

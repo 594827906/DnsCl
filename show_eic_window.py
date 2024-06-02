@@ -5,8 +5,6 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5 import QtWidgets, QtGui, QtCore
-from utils.threading import Worker
-from view_from_processed import eic_from_csv
 
 
 class eic_window(QtWidgets.QDialog):

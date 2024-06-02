@@ -1,10 +1,5 @@
 import sys
 import os
-import json
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from plot import PlotWindow, match_parawindow1, match_parawindow2
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
@@ -12,7 +7,6 @@ from utils.threading import Worker
 from preprocess import defect_process
 from background_subtract import denoise_bg
 from show_eic_window import eic_window, ClickableListWidget
-from view_from_processed import eic_from_csv
 
 
 class MainWindow(PlotWindow):
@@ -29,6 +23,19 @@ class MainWindow(PlotWindow):
         self._list_of_mzxml.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
         self._list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
         # self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
+
+        if getattr(sys, 'frozen', False):
+            # 如果是打包后的可执行文件，sys.frozen 会被设置为 True
+            executable_path = sys.executable
+        else:
+            # 否则，使用脚本文件的路径
+            executable_path = __file__
+
+            # 获取可执行文件所在的目录
+        executable_directory = os.path.dirname(os.path.abspath(executable_path))
+
+        # 设置工作目录为可执行文件所在的目录
+        os.chdir(executable_directory)
 
     def _create_menu(self):
         # menu = QtWidgets.QMenuBar(self)
