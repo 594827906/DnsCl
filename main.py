@@ -401,7 +401,7 @@ class defect_parawindow(QtWidgets.QDialog):
         file_choose_layout = QtWidgets.QHBoxLayout()
 
         choose_file_label = QtWidgets.QLabel()
-        choose_file_label.setText('Choose a .mzXML to denoise:')
+        choose_file_label.setText('Choose a .mzXML to simplify:')
         choose_file_label.setFont(font)
         self.mzxml_path = QtWidgets.QLineEdit()
         choose_button = QtWidgets.QToolButton()
@@ -553,9 +553,9 @@ class defect_parawindow(QtWidgets.QDialog):
 
             file_name = os.path.basename(self.path)
             name, extension = os.path.splitext(file_name)
-            worker = Worker('Defecting ...', defect_process, self.path, self.lower_rt, self.upper_rt,
+            worker = Worker('Simplifying ...', defect_process, self.path, self.lower_rt, self.upper_rt,
                             self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
-            worker.signals.result.connect(partial(self.result_to_csv, name+'_defected.csv'))
+            worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified.csv'))
             # worker.signals.result.connect(self.start_sample)
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
