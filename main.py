@@ -78,7 +78,7 @@ class MainWindow(PlotWindow):
         # background subtraction denoise(step2&3)
         denoise = menu.addMenu('Denoising')
 
-        Mass_defect_limit = QtWidgets.QAction('Mass defect limit', self)
+        Mass_defect_limit = QtWidgets.QAction('Spectrogram simplification', self)
         Mass_defect_limit.triggered.connect(self.mass_defect_limit)
         denoise.addAction(Mass_defect_limit)
 
@@ -387,7 +387,7 @@ class defect_parawindow(QtWidgets.QDialog):
     def __init__(self, parent: MainWindow):
         self.parent = parent
         super().__init__(self.parent)
-        self.setWindowTitle('Mass defect limit option')
+        self.setWindowTitle('Spectrogram simplification option')
         self._thread_pool = QtCore.QThreadPool()
 
         # 字体设置
@@ -401,7 +401,7 @@ class defect_parawindow(QtWidgets.QDialog):
         file_choose_layout = QtWidgets.QHBoxLayout()
 
         choose_file_label = QtWidgets.QLabel()
-        choose_file_label.setText('Choose a .mzXML to defect:')
+        choose_file_label.setText('Choose a .mzXML to denoise:')
         choose_file_label.setFont(font)
         self.mzxml_path = QtWidgets.QLineEdit()
         choose_button = QtWidgets.QToolButton()
