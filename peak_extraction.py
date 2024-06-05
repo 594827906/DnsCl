@@ -92,8 +92,8 @@ def obtain_MS2(mzXML_file):
 
 # ----------------------  function for  MS/MS matching----------------------- #
 def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与逻辑
-    values_str = fragments.split(',')
-    values = [float(num) for num in values_str]
+    values_str = fragments.split(',')  # 输入是字符串，按英文逗号分隔
+    values = [float(num) for num in values_str]  # 转为浮点
     ind_list = []
     mz_tar_list = []
     mz_tar_tensor = []
@@ -109,28 +109,26 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
 
     ms2mz = np.array(new_ms2['MS2mz'])
 
-    # 查找目标片段并记录相应的 precusormz
+    # 对传入的所有目标值，查找容差内的 mz 值并记录
     for target in values:
-        index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]  # 提取第一个tar的indexlist
-        for ind in index:
+        index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]  # 提取包含 target1 的 index list
+        for ind in index:  # 将index list 中的 index 对应的 mz 和 rt 添加到数组中
             mz_tar_list.append(new_ms2.loc[ind, 'precusormz'])
             rt_tar_list.append(new_ms2.loc[ind, 'RT'])
-        mz_tar_tensor.append(mz_tar_list)
+        mz_tar_tensor.append(mz_tar_list)  # 将 target1 获得的mz和rt写到tensor的第一行
         rt_tar_tensor.append(rt_tar_list)
-        mz_tar_list = []
+        mz_tar_list = []  # 清空数组，继续记录 target2 对应的mz和rt，然后添加到tensor的第二行，以此类推
         rt_list = []
 
-    num_rows = len(mz_tar_tensor)
-    len_first_row = len(mz_tar_tensor[0])
+    num_rows = len(mz_tar_tensor)  # 获取tensor中的行数（即目标值个数）
+    len_first_row = len(mz_tar_tensor[0])  # 获取第一行的长度
 
-    # 遍历第一行中的元素，并检查其余行是否都有
-    for ind in range(len_first_row):
-        element = mz_tar_tensor[0][ind]
-        # 检查该元素是否在所有其他行中都存在
-        if all(element in mz_tar_tensor[row] for row in range(1, num_rows)):
-            # 记录该元素及其在第一行中的索引
-            mz_list.append(element)
-            rt_list.append(rt_tar_tensor[0][ind])
+    # 遍历 mz_tar_tensor 第一行中的元素，并检查其余行是否都有这个值
+    for ind in range(len_first_row):  # 对于 mz_tar_tensor 第一行中的索引
+        element = mz_tar_tensor[0][ind]  # 获取 mz 值
+        if all(element in mz_tar_tensor[row] for row in range(1, num_rows)):  # 该值是否在所有其余行中都存在
+            mz_list.append(element)  # 将该值添加到 mz_list
+            rt_list.append(rt_tar_tensor[0][ind])  # 将对应的rt添加到rt_list
 
     # 获得 input_df 中的 mz, RT 和 intensity
     mz_den = np.array(input_df['mz'])
@@ -154,7 +152,7 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
     values_str = fragments.split(',')
     values = [float(num) for num in values_str]
     ind_list = []
-    all_tar = set()
+    all_tar = set()  # 创建一个集合来存放所有满足条件的mz值
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
@@ -164,14 +162,14 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
     ms2mz = np.array(new_ms2['MS2mz'])
     precusormz = np.array(new_ms2['precusormz'])
 
-    for target in values:
+    for target in values:  # 对所有 target 值，找到数据中容差范围内的值，获取索引
         index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]
         ind_list.append(index)
 
-    for ind in ind_list:
+    for ind in ind_list:  # 对所有满足条件的索引，将mz值添加到数集中，形成并集
         all_tar.update(precusormz[ind])
 
-    exist_precmz = list(all_tar)
+    exist_precmz = list(all_tar)  # 将集合格式转化为list
     mz_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['precusormz'])
     rt_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['RT'])
 
