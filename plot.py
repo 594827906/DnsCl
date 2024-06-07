@@ -36,6 +36,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._label2line = dict()  # a label (aka line name) to plotted line
         self._canvas = FigureCanvas(self._figure)
         self._toolbar = NavigationToolbar(self._canvas, self)
+        self._figure.canvas.mpl_connect('button_press_event', self.on_click)
 
     def _threads_finisher(self, text=None, icon=None, pb=None):
         if pb is not None:
@@ -57,6 +58,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def scroll_event(self, event):  # 滚轮缩放
         x_min, x_max = event.inaxes.get_xlim()
         # x_range = (x_max - x_min) / 10
+        scale = 1
         scale_factor = 1.2
         xdata = event.xdata
         if event.button == 'up':
@@ -67,6 +69,28 @@ class PlotWindow(QtWidgets.QMainWindow):
         self.fig_top.set_xlim(x_lim)
         self.fig_bottom.set_xlim(x_lim)
         self._canvas.draw_idle()
+
+    def on_click(self, event):  # 绘制辅助线
+        # 获取点击位置的坐标
+        x = event.xdata
+
+        # 获取横坐标的整数值
+        # x_int = int(x)
+        # 清除子图中的竖线
+        for line in self.fig_top.lines:
+            if line.get_linestyle() == '--':
+                line.remove()
+
+        for line in self.fig_bottom.lines:
+            if line.get_linestyle() == '--':
+                line.remove()
+
+        # 在子图中绘制竖线
+        self.fig_top.axvline(x=x, color='red', linestyle='--')
+        self.fig_bottom.axvline(x=x, color='red', linestyle='--')
+
+        # 刷新绘图
+        self._figure.canvas.draw()
 
     def plotter(self, obj):
         # if not self._label2line:  # in case if 'feature' was plotted
@@ -219,7 +243,7 @@ class match_parawindow1(QtWidgets.QDialog):
         self.nl_label.setFont(font)
         self.nl_set = QtWidgets.QLineEdit()
         if mode == '1':
-            self.nl_set.setText('63.96125')
+            self.nl_set.setText('63.96135')
             self.nl_set.setFixedSize(100, 30)
         elif mode == '3':
             self.nl_set.setText('6')
@@ -297,7 +321,7 @@ class match_parawindow1(QtWidgets.QDialog):
             self.close()
 
             # TODO:确认rt和mz的单位
-            worker = Worker('Neutral loss matching...', neut_loss, path, nl, mz_win*10e-7, rt_win/60)
+            worker = Worker('Neutral loss matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
             worker.signals.result.connect(partial(self.save_as_txt, 'NL.txt'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
@@ -317,7 +341,7 @@ class match_parawindow1(QtWidgets.QDialog):
             self.close()
 
             # TODO:确认rt和mz的单位
-            worker = Worker('Isotope feature matching...', neut_loss, path, nl, mz_win*10e-7, rt_win/60)
+            worker = Worker('Isotope feature matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
             worker.signals.result.connect(partial(self.save_as_txt, 'isotope.txt'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)

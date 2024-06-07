@@ -18,15 +18,15 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
 
     mass = np.array(input_df['mz'])
     rt = np.array(input_df['RT'])
-    intensity = np.array(input_df['intensity (Sample)'])
+    intensity = np.array(input_df['intensity'])
 
     nlmass = mass-NL
     matchmz = []
     num_peak = 0
     for i in np.unique(nlmass[nlmass > 150]):
         ind_nl = np.where(nlmass == i)[0]
-        ind_matched = np.where(np.abs(i-mass)/i <= mz_tol)[0]       
-        # print('matched mass:',np.unique(mass[ind_matched]))
+        ind_matched = np.where(np.abs(mass-i)/i <= mz_tol)[0]
+        print('matched mass:', np.unique(mass[ind_matched]))
         
         # if >2 matched
         if np.size(ind_matched) > 0:
@@ -36,26 +36,24 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
                 intensity_matched = intensity[mass == p]
 
                 # 字符串列表转为数值
-                for l in np.arange(len(rt_matched)):
-                    f_rt_matched = np.array(rt_matched[l][1:-1].split(','), dtype=np.float64)
-                    f_intensity_matched = np.array(intensity_matched[l][1:-1].split(','), dtype=np.float64)
+                # for l in np.arange(len(rt_matched)):
+                #     f_rt_matched = np.array(rt_matched[l][1:-1].split(','), dtype=np.float64)
+                #     f_intensity_matched = np.array(intensity_matched[l][1:-1].split(','), dtype=np.float64)
 
-                    for m in mass[ind_nl]:
-                        rt_nl = rt[mass == m]
-                        intensity_nl = intensity[mass == m]
+                for m in np.unique(mass[ind_nl]):
+                    rt_nl = rt[mass == m]
+                    intensity_nl = intensity[mass == m]
 
-                        for n in np.arange(len(rt_nl)):
-                                
-                            # 字符串列表转为数值
-                            f_rt_nl = np.array(rt_nl[n][1:-1].split(','), dtype=np.float64)
-                            f_intensity_nl = np.array(intensity_nl[n][1:-1].split(','), dtype=np.float64)
+                    # for n in np.arange(len(rt_nl)):  # 字符串列表转为数值
+                    #    f_rt_nl = np.array(rt_nl[n][1:-1].split(','), dtype=np.float64)
+                    #    f_intensity_nl = np.array(intensity_nl[n][1:-1].split(','), dtype=np.float64)
 
-                            # 判断条件
-                            condition = np.abs(f_rt_nl[np.argmax(f_intensity_nl)]-f_rt_matched[np.argmax(f_intensity_matched)])
+                    # 判断条件
+                    condition = np.abs(rt_nl[np.argmax(intensity_nl)]-rt_matched[np.argmax(intensity_matched)])
                             
-                            if condition <= rt_tol:
-                                num_peak += 1
-                                matchmz.append(p)
+                    if condition <= rt_tol:
+                        num_peak += 1
+                        matchmz.append(p)
     print('num of peaks be found by neutral loss:', num_peak)
     print('matched mass:', matchmz)
     return matchmz
@@ -133,19 +131,20 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
     # 获得 input_df 中的 mz, RT 和 intensity
     mz_den = np.array(input_df['mz'])
     rt_den = np.array(input_df['RT'])
-    intensity_den = np.array(input_df['intensity (Sample)'])
+    intensity_den = np.array(input_df['intensity'])
     match_mz = []
     for i in np.arange(len(mz_list)):
-        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)
+        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)[0]
         if np.size(ind) >= 1:
-            for p in np.arange(len(ind)):
-                temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
-                max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
+            # for p in np.arange(len(ind)):
+            #     temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
+            #     max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
+            inten = intensity_den[ind]
+            max_rt = rt_den[ind][np.argmax(inten)]
+            if np.abs(max_rt - rt_list[i]) <= tol_rt:
+                match_mz.extend(mz_den[ind])
 
-                if np.abs(max_rt - rt_list[i]) <= tol_rt:
-                    match_mz.append(mz_den[ind][p])
-
-    return match_mz
+    return np.unique(match_mz)
 
 
 def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或逻辑
@@ -175,19 +174,20 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
 
     mz_den = np.array(input_df['mz'])
     rt_den = np.array(input_df['RT'])
-    intensity_den = np.array(input_df['intensity (Sample)'])
+    intensity_den = np.array(input_df['intensity'])
     match_mz = []
     for i in np.arange(len(mz_list)):
-        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)
+        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)[0]
         if np.size(ind) >= 1:
-            for p in np.arange(len(ind)):
-                temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
-                max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
+            # for p in np.arange(len(ind)):
+            #     temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
+            #     max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
+            inten = intensity_den[ind]
+            max_rt = rt_den[ind][np.argmax(inten)]
+            if np.abs(max_rt - rt_list[i]) <= tol_rt:
+                match_mz.extend(mz_den[ind])
 
-                if np.abs(max_rt - rt_list[i]) <= tol_rt:
-                    match_mz.append(mz_den[ind][p])
-
-    return match_mz
+    return np.unique(match_mz)
 
 
 # ------------- main ----------------#
@@ -217,14 +217,3 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
 #          match_mz.append(t_mass[i])
 # print('total of match:', matchsum)
 # print(match_mz)
-
-
-    
-
-
-
-
-
-
-
-

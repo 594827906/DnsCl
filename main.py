@@ -522,7 +522,7 @@ class defect_parawindow(QtWidgets.QDialog):
         para_setting.addRow(thd_label, thd_layout)
 
         ok_button = QtWidgets.QPushButton('OK')
-        ok_button.clicked.connect(self.defect)
+        ok_button.clicked.connect(self.simplify)
         ok_button.setFont(font)
         ok_button.resize(80, 80)  # 未生效
 
@@ -538,7 +538,7 @@ class defect_parawindow(QtWidgets.QDialog):
         if file:
             self.mzxml_path.setText(file)
 
-    def defect(self):
+    def simplify(self):
         try:
             self.path = self.mzxml_path.text()
             self.lower_rt = float(self.lower_rt.text())
@@ -707,14 +707,15 @@ class denoise_parawindow(QtWidgets.QDialog):
             rt_win = float(self.rt_window.text())
             mz_win = float(self.mz_window.text())
             ratio = float(self.ratio.text())
+            sample_name = os.path.basename(sample)
+            name, extension = os.path.splitext(sample_name)
             self.close()
 
             worker = Worker('Background subtract denoising...', denoise_bg,
                             blank, sample, mz_win*10e-7, rt_win/60, ratio)
-            # worker.signals.result.connect(partial(self.result_to_csv, 'denoise_Area.csv'))
-            worker.signals.result.connect(self.view_eic)
+            worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised.csv'))
+            # worker.signals.result.connect(self.view_eic)
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            # TODO:连接到一个特征查看窗口，选择item显示EIC
             self._thread_pool.start(worker)
         except ValueError:
             # popup window with exception
@@ -725,7 +726,7 @@ class denoise_parawindow(QtWidgets.QDialog):
 
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
-        # self.parent._list_of_processed.addFile(name)
+        self.parent._list_of_processed.addFile(name)
 
     def view_eic(self, df):
         subwindow = eic_window(self, df)
