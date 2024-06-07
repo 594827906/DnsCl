@@ -10,7 +10,7 @@ def tic_from_csv(file, label, mode):  # 从处理后的csv中绘制TIC图
     max_scan = df.iloc[-1]['scan']  # 获取最大scan数
     min_scan = df.iloc[0]['scan']  # 获取最小scan
     min_time = df.iloc[0]['RT']  # 获取最小time
-    scan_freq = min_time / min_scan
+    scan_freq = min_time / min_scan  # 对扫描频率的估算，非常不准
     max_scan = max_scan.astype(int)  # 转换为整型
     for scan in range(1, max_scan):
         if (df['scan'] == scan).any():
@@ -18,9 +18,9 @@ def tic_from_csv(file, label, mode):  # 从处理后的csv中绘制TIC图
             tic.append(tot_intensity)
             t = df.loc[df['scan'] == scan, 'RT'].values[0]  # get scan time
             time.append(t)
-        else:
-            tic.append(0)
-            time.append(scan * scan_freq)
+        # else:
+        #     tic.append(0)
+        #     time.append(scan * scan_freq)
         # if progress_callback is not None and not i % 10:  # 备用：进度条
         #     progress_callback.emit(int(i * 100 / max_scan))
 

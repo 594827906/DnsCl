@@ -28,8 +28,10 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._figure = plt.figure()
         self.fig_top = self._figure.add_subplot(211)  # plot sample
         self.fig_top.ticklabel_format(axis='y', scilimits=(0, 0))
+        self.fig_top.set_ylim(bottom=0)
         self.fig_bottom = self._figure.add_subplot(212)  # plot blank
         self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))
+        self.fig_bottom.set_ylim(bottom=0)
         self.fig_bottom.set_xlabel('Retention time [min]')
         self._figure.tight_layout()
         # self._figure.subplots_adjust(hspace=0.0, wspace=0.0)
@@ -102,6 +104,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self.fig_top.set_ylabel('Intensity')
             self.fig_top.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
             line = self.fig_top.plot(obj['x'], obj['y'], label=obj['label'])
+            self.fig_top.set_ylim(bottom=0)
             self.fig_top.legend(loc='best')
             self.fig_top.grid(alpha=0.8)
         if obj['mode'] == 'bottom':
@@ -112,6 +115,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self.fig_bottom.set_ylabel('Intensity')
             self.fig_bottom.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
             line = self.fig_bottom.plot(obj['x'], obj['y'], label=obj['label'])
+            self.fig_bottom.set_ylim(bottom=0)  # 使y轴底部从0开始，似乎要放在plot之后才能正确显示绘图。
             self.fig_bottom.legend(loc='best')
             self.fig_bottom.grid(alpha=0.8)
 
@@ -322,7 +326,7 @@ class match_parawindow1(QtWidgets.QDialog):
 
             # TODO:确认rt和mz的单位
             worker = Worker('Neutral loss matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
-            worker.signals.result.connect(partial(self.save_as_txt, 'NL.txt'))
+            worker.signals.result.connect(partial(self.result_to_csv, 'NL.csv'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
         except ValueError:
@@ -342,7 +346,7 @@ class match_parawindow1(QtWidgets.QDialog):
 
             # TODO:确认rt和mz的单位
             worker = Worker('Isotope feature matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
-            worker.signals.result.connect(partial(self.save_as_txt, 'isotope.txt'))
+            worker.signals.result.connect(partial(self.result_to_csv, 'isotope.csv'))
             worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
             self._thread_pool.start(worker)
         except ValueError:
@@ -359,6 +363,10 @@ class match_parawindow1(QtWidgets.QDialog):
         msg = QtWidgets.QMessageBox(self)
         msg.setText("Result has been saved as " + filename + " successfully!")
         msg.exec_()
+
+    def result_to_csv(self, name, df):
+        df.to_csv(name, index=False)
+        self.parent._list_of_processed.addFile(name)
 
 
 class match_parawindow2(QtWidgets.QDialog):
@@ -545,7 +553,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 链接逻辑all函数
-        worker2.signals.result.connect(partial(self.save_as_txt, 'fragment_all.txt'))
+        worker2.signals.result.connect(partial(self.result_to_csv, 'fragment_all.csv'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -553,7 +561,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 连接逻辑or函数
-        worker2.signals.result.connect(partial(self.save_as_txt, 'fragment_one.txt'))
+        worker2.signals.result.connect(partial(self.result_to_csv, 'fragment_one.csv'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -564,6 +572,10 @@ class match_parawindow2(QtWidgets.QDialog):
         msg = QtWidgets.QMessageBox(self)
         msg.setText("Result has been saved as " + filename + " successfully!")
         msg.exec_()
+
+    def result_to_csv(self, name, df):
+        df.to_csv(name, index=False)
+        self.parent._list_of_processed.addFile(name)
 
 
 class ProgressBarsListItem(QtWidgets.QWidget):

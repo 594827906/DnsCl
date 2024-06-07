@@ -23,40 +23,33 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
     nlmass = mass-NL
     matchmz = []
     num_peak = 0
+    rows_to_add = []
     for i in np.unique(nlmass[nlmass > 150]):
         ind_nl = np.where(nlmass == i)[0]
         ind_matched = np.where(np.abs(mass-i)/i <= mz_tol)[0]
-        print('matched mass:', np.unique(mass[ind_matched]))
+        # print('matched mass:', np.unique(mass[ind_matched]))
         
         # if >2 matched
         if np.size(ind_matched) > 0:
             # print(len(mass[ind_matched]))
             for p in np.unique(mass[ind_matched]):
-                rt_matched = rt[mass == p]
+                rt_matched = rt[mass == p]  # 找到符合mz差值的所有rt
                 intensity_matched = intensity[mass == p]
-
-                # 字符串列表转为数值
-                # for l in np.arange(len(rt_matched)):
-                #     f_rt_matched = np.array(rt_matched[l][1:-1].split(','), dtype=np.float64)
-                #     f_intensity_matched = np.array(intensity_matched[l][1:-1].split(','), dtype=np.float64)
-
-                for m in np.unique(mass[ind_nl]):
-                    rt_nl = rt[mass == m]
+                for m in np.unique(mass[ind_nl]):  # m=p+NL
+                    rt_nl = rt[mass == m]  # m的rt
                     intensity_nl = intensity[mass == m]
-
-                    # for n in np.arange(len(rt_nl)):  # 字符串列表转为数值
-                    #    f_rt_nl = np.array(rt_nl[n][1:-1].split(','), dtype=np.float64)
-                    #    f_intensity_nl = np.array(intensity_nl[n][1:-1].split(','), dtype=np.float64)
-
-                    # 判断条件
+                    # 判断条件：m与p的rt差
                     condition = np.abs(rt_nl[np.argmax(intensity_nl)]-rt_matched[np.argmax(intensity_matched)])
                             
                     if condition <= rt_tol:
                         num_peak += 1
-                        matchmz.append(p)
-    print('num of peaks be found by neutral loss:', num_peak)
-    print('matched mass:', matchmz)
-    return matchmz
+                        # 修改：符合条件的，获得母离子索引ind_nl
+                        matchmz.append(m)
+                        rows_to_add.extend(ind_nl)
+    nl_df = input_df.loc[rows_to_add]
+    # print('num of peaks be found by neutral loss:', num_peak)
+    # print('matched mass:', matchmz)
+    return nl_df  # matchmz用于验证
 
 
 # -------------------prepare for plot MS/MS----------------------- #
@@ -92,13 +85,13 @@ def obtain_MS2(mzXML_file):
 def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与逻辑
     values_str = fragments.split(',')  # 输入是字符串，按英文逗号分隔
     values = [float(num) for num in values_str]  # 转为浮点
-    ind_list = []
     mz_tar_list = []
     mz_tar_tensor = []
     rt_tar_list = []
     rt_tar_tensor = []
     mz_list = []
     rt_list = []
+    rows_to_add = []
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
@@ -143,14 +136,16 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
             max_rt = rt_den[ind][np.argmax(inten)]
             if np.abs(max_rt - rt_list[i]) <= tol_rt:
                 match_mz.extend(mz_den[ind])
-
-    return np.unique(match_mz)
+                rows_to_add.extend(ind)
+    nl_df = input_df.loc[rows_to_add]
+    return nl_df  # np.unique(match_mz)用于验证
 
 
 def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或逻辑
     values_str = fragments.split(',')
     values = [float(num) for num in values_str]
     ind_list = []
+    rows_to_add = []
     all_tar = set()  # 创建一个集合来存放所有满足条件的mz值
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
@@ -186,8 +181,9 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
             max_rt = rt_den[ind][np.argmax(inten)]
             if np.abs(max_rt - rt_list[i]) <= tol_rt:
                 match_mz.extend(mz_den[ind])
-
-    return np.unique(match_mz)
+                rows_to_add.extend(ind)
+    nl_df = input_df.loc[rows_to_add]
+    return nl_df  # np.unique(match_mz)用于验证
 
 
 # ------------- main ----------------#

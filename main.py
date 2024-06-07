@@ -41,7 +41,6 @@ class MainWindow(PlotWindow):
         # menu = QtWidgets.QMenuBar(self)
         menu = self.menuBar()
 
-        # file submenu(step1&5):导入文件、每一步处理后的图谱、最终筛选出的mz、rt、intensity（csv?）
         file = menu.addMenu('File')
 
         # 导入mzxml文件
@@ -102,40 +101,54 @@ class MainWindow(PlotWindow):
         self.setWindowTitle('DnsCl')
 
         # 左侧布局
+        widget_left = QtWidgets.QWidget()
         mzxml_list_label = QtWidgets.QLabel('.mzXML file list：')
         self._list_of_mzxml = FileListWidget()
         process_list_label = QtWidgets.QLabel('Processed file list：')
         self._list_of_processed = FileListWidget()
 
-        layout_left = QtWidgets.QVBoxLayout()
+        layout_left = QtWidgets.QVBoxLayout(widget_left)
         layout_left.addWidget(mzxml_list_label)
         layout_left.addWidget(self._list_of_mzxml, 2)
         layout_left.addWidget(process_list_label)
         layout_left.addWidget(self._list_of_processed, 6)
 
         # 中间布局
-        layout_mid = QtWidgets.QHBoxLayout()
+        widget_mid = QtWidgets.QWidget()
+        layout_mid = QtWidgets.QHBoxLayout(widget_mid)
         layout_plot = QtWidgets.QVBoxLayout()
         layout_plot.addWidget(self._toolbar)
         layout_plot.addWidget(self._canvas, 9)
 
-        # 进度条布局
-        scrollable_pb_list = QtWidgets.QScrollArea()
-        scrollable_pb_list.setWidget(self._pb_list)
-        scrollable_pb_list.setWidgetResizable(True)
-        # layout_plot.addWidget(scrollable_pb_list, 1)
-
         layout_mid.addLayout(layout_plot)
 
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        splitter.addWidget(widget_left)
+        splitter.addWidget(widget_mid)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+        splitter.setStyleSheet(
+            """
+                QSplitter::handle {
+                    background: qlineargradient(
+                        x1: 0, y1: 0, x2: 1, y2: 0,
+                        stop: 0 black, stop: 0.3 transparent, stop: 0.5 black, stop: 0.7 transparent, stop: 1 black
+                    );
+                }
+            """)
+
+        main_layout = QtWidgets.QVBoxLayout()
+        main_layout.addWidget(splitter)
+
         # 主视窗布局
-        layout = QtWidgets.QHBoxLayout()
-        layout.addLayout(layout_left, 1)
-        layout.addLayout(layout_mid, 9)
+        # layout = QtWidgets.QHBoxLayout()
+        # layout.addLayout(layout_left, 1)
+        # layout.addLayout(layout_mid, 9)
 
         # self.setLayout(layout)
 
         widget = QtWidgets.QWidget()
-        widget.setLayout(layout)
+        widget.setLayout(main_layout)
 
         self.setCentralWidget(widget)
 
@@ -553,7 +566,7 @@ class defect_parawindow(QtWidgets.QDialog):
 
             file_name = os.path.basename(self.path)
             name, extension = os.path.splitext(file_name)
-            worker = Worker('Simplifying ...', defect_process, self.path, self.lower_rt, self.upper_rt,
+            worker = Worker('Simplifying ... (may take a few minutes)', defect_process, self.path, self.lower_rt, self.upper_rt,
                             self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
             worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified.csv'))
             # worker.signals.result.connect(self.start_sample)
@@ -574,7 +587,7 @@ class defect_parawindow(QtWidgets.QDialog):
     #     self._thread_pool.start(worker1)
 
     def result_to_csv(self, name, df):
-        df.to_csv(name)
+        df.to_csv(name, index=False)
         self.parent._list_of_processed.addFile(name)
 
 
