@@ -19,6 +19,9 @@ class MainWindow(PlotWindow):
         self.setStyleSheet(style_sheet)
         self.show()
 
+        self.opened_mzxml = []
+        self.opened_csv = []
+
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self._list_of_mzxml.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
         self._list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
@@ -156,11 +159,13 @@ class MainWindow(PlotWindow):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'mzXML (*.mzXML)')[0]
         for name in files_names:
             self._list_of_mzxml.addFile(name)
+            self.opened_mzxml.append(name)
 
     def _open_csv(self):
         files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'csv (*.csv)')[0]
         for name in files_names:
             self._list_of_processed.addFile(name)
+            self.opened_csv.append(name)
 
     def _export_features(self, mode):
         if self._list_of_mzxml.count() > 0:
@@ -307,8 +312,11 @@ class ProcessedListMenu(QtWidgets.QMenu):
             # self.parent.plot_processed(item)
 
     def close_files(self):
-        for item in self.get_selected_files():
-            self.parent._list_of_processed.deleteFile(item)
+        for file in self.get_selected_files():
+            filename = file.text()
+            path = self.parent._list_of_processed.file2path[filename]
+            self.parent.opened_csv.remove(path)
+            self.parent._list_of_processed.deleteFile(file)
 
     def get_selected_files(self):
         return self.parent._list_of_processed.selectedItems()
@@ -360,12 +368,13 @@ class FileListMenu(QtWidgets.QMenu):
         self.parent.refresh_canvas()
 
     def close_files(self):
-        for item in self.get_selected_files():
-            self.parent._list_of_mzxml.deleteFile(item)
-
+        for file in self.get_selected_files():
+            filename = file.text()
+            path = self.parent._list_of_mzxml.file2path[filename]
+            self.parent.opened_mzxml.remove(path)
+            self.parent._list_of_mzxml.deleteFile(file)
     def get_selected_files(self):
         return self.parent._list_of_mzxml.selectedItems()
-
 
 
 class FileListWidget(ClickableListWidget):
@@ -416,14 +425,15 @@ class defect_parawindow(QtWidgets.QDialog):
         choose_file_label = QtWidgets.QLabel()
         choose_file_label.setText('Choose a .mzXML to simplify:')
         choose_file_label.setFont(font)
-        self.mzxml_path = QtWidgets.QLineEdit()
-        choose_button = QtWidgets.QToolButton()
-        choose_button.setText('...')
-        choose_button.setFont(font)
-        choose_button.clicked.connect(self.set_file)
+        self.mzxml_path = QtWidgets.QComboBox()
+        self.mzxml_path.addItems(self.parent.opened_mzxml)
+        # choose_button = QtWidgets.QToolButton()
+        # choose_button.setText('...')
+        # choose_button.setFont(font)
+        # choose_button.clicked.connect(self.set_file)
 
         file_choose_layout.addWidget(self.mzxml_path)
-        file_choose_layout.addWidget(choose_button)
+        # file_choose_layout.addWidget(choose_button)
         files_layout.addWidget(choose_file_label)
         files_layout.addLayout(file_choose_layout)
 
@@ -546,14 +556,20 @@ class defect_parawindow(QtWidgets.QDialog):
         layout.addWidget(ok_button)
         self.setLayout(layout)
 
-    def set_file(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'mzxml(*.mzXML)')
-        if file:
-            self.mzxml_path.setText(file)
+    # def set_file(self):
+    #     file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'mzxml(*.mzXML)')
+    #     if file:
+    #         self.mzxml_path.setText(file)
 
     def simplify(self):
-        try:
-            self.path = self.mzxml_path.text()
+        self.path = self.mzxml_path.currentText()
+
+        if len(self.path) == 0:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Choose a file to process!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+        else:
             self.lower_rt = float(self.lower_rt.text())
             self.upper_rt = float(self.upper_rt.text())
             self.lower_mz = float(self.lower_mz.text())
@@ -564,20 +580,21 @@ class defect_parawindow(QtWidgets.QDialog):
             self.intensity_thd = float(self.intensity_thd.text())
             self.close()
 
-            file_name = os.path.basename(self.path)
-            name, extension = os.path.splitext(file_name)
-            worker = Worker('Simplifying ... (may take a few minutes)', defect_process, self.path, self.lower_rt, self.upper_rt,
-                            self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
-            worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified.csv'))
-            # worker.signals.result.connect(self.start_sample)
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            self._thread_pool.start(worker)
-        except ValueError:
-            # popup window with exception
-            msg = QtWidgets.QMessageBox(self)
-            msg.setText("Check parameters, something is wrong!")
-            msg.setIcon(QtWidgets.QMessageBox.Warning)
-            msg.exec_()
+            try:
+                file_name = os.path.basename(self.path)
+                name, extension = os.path.splitext(file_name)
+                worker = Worker('Simplifying... (may take a few minutes)', defect_process, self.path, self.lower_rt, self.upper_rt,
+                                self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
+                worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified.csv'))
+                # worker.signals.result.connect(self.start_sample)
+                worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+                self._thread_pool.start(worker)
+            except ValueError:
+                # popup window with exception
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Check parameters, something is wrong!")
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
 
     # def start_sample(self):
     #     worker1 = Worker('processing sample...', defect_process, self.sample, self.lower_rt, self.upper_rt,
@@ -589,6 +606,7 @@ class defect_parawindow(QtWidgets.QDialog):
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
         self.parent._list_of_processed.addFile(name)
+        self.parent.opened_csv.append(name)  # TODO:现在添加的是文件名，增加选择保存目录的功能后，改为添加路径！！
 
 
 class denoise_parawindow(QtWidgets.QDialog):
