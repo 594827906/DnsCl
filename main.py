@@ -630,25 +630,27 @@ class denoise_parawindow(QtWidgets.QDialog):
         choose_blank_label = QtWidgets.QLabel()
         choose_blank_label.setText('Choose a .csv as blank:')
         choose_blank_label.setFont(font)
-        self.blank_edit = QtWidgets.QLineEdit()
-        blank_button = QtWidgets.QToolButton()
-        blank_button.setText('...')
-        blank_button.setFont(font)
-        blank_button.clicked.connect(self.set_blank)
+        self.blank_edit = QtWidgets.QComboBox()
+        self.blank_edit.addItems(self.parent.opened_csv)
+        # blank_button = QtWidgets.QToolButton()
+        # blank_button.setText('...')
+        # blank_button.setFont(font)
+        # blank_button.clicked.connect(self.set_blank)
 
         choose_sample_label = QtWidgets.QLabel()
         choose_sample_label.setText('Choose a .csv as sample:')
         choose_sample_label.setFont(font)
-        self.sample_edit = QtWidgets.QLineEdit()
-        sample_button = QtWidgets.QToolButton()
-        sample_button.setText('...')
-        sample_button.setFont(font)
-        sample_button.clicked.connect(self.set_sample)
+        self.sample_edit = QtWidgets.QComboBox()
+        self.sample_edit.addItems(self.parent.opened_csv)
+        # sample_button = QtWidgets.QToolButton()
+        # sample_button.setText('...')
+        # sample_button.setFont(font)
+        # sample_button.clicked.connect(self.set_sample)
 
         blank_choose_layout.addWidget(self.blank_edit)
-        blank_choose_layout.addWidget(blank_button)
+        # blank_choose_layout.addWidget(blank_button)
         sample_choose_layout.addWidget(self.sample_edit)
-        sample_choose_layout.addWidget(sample_button)
+        # sample_choose_layout.addWidget(sample_button)
         files_layout.addWidget(choose_blank_label)
         files_layout.addLayout(blank_choose_layout)
         files_layout.addWidget(choose_sample_label)
@@ -721,43 +723,50 @@ class denoise_parawindow(QtWidgets.QDialog):
         layout.addLayout(para_layout)
         self.setLayout(layout)
 
-    def set_blank(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
-        if file:
-            self.blank_edit.setText(file)
-
-    def set_sample(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
-        if file:
-            self.sample_edit.setText(file)
+    # def set_blank(self):
+    #     file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
+    #     if file:
+    #         self.blank_edit.setText(file)
+    #
+    # def set_sample(self):
+    #     file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
+    #     if file:
+    #         self.sample_edit.setText(file)
 
     def denoise(self):
-        try:
-            blank = self.blank_edit.text()
-            sample = self.sample_edit.text()
-            rt_win = float(self.rt_window.text())
-            mz_win = float(self.mz_window.text())
-            ratio = float(self.ratio.text())
-            sample_name = os.path.basename(sample)
-            name, extension = os.path.splitext(sample_name)
-            self.close()
-
-            worker = Worker('Background subtract denoising...', denoise_bg,
-                            blank, sample, mz_win*10e-7, rt_win/60, ratio)
-            worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised.csv'))
-            # worker.signals.result.connect(self.view_eic)
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            self._thread_pool.start(worker)
-        except ValueError:
-            # popup window with exception
+        blank = self.blank_edit.currentText()
+        sample = self.sample_edit.currentText()
+        if len(blank) == 0 or len(sample) == 0:
             msg = QtWidgets.QMessageBox(self)
-            msg.setText("Check parameters, something is wrong!")
+            msg.setText("Choose a file to process!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
+        else:
+            try:
+                rt_win = float(self.rt_window.text())
+                mz_win = float(self.mz_window.text())
+                ratio = float(self.ratio.text())
+                sample_name = os.path.basename(sample)
+                name, extension = os.path.splitext(sample_name)
+                self.close()
+
+                worker = Worker('Background subtract denoising...', denoise_bg,
+                                blank, sample, mz_win*10e-7, rt_win/60, ratio)
+                worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised.csv'))
+                # worker.signals.result.connect(self.view_eic)
+                worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+                self._thread_pool.start(worker)
+            except ValueError:
+                # popup window with exception
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Check parameters, something is wrong!")
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
 
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
         self.parent._list_of_processed.addFile(name)
+        self.parent.opened_csv.append(name)
 
     def view_eic(self, df):
         subwindow = eic_window(self, df)

@@ -224,14 +224,15 @@ class match_parawindow1(QtWidgets.QDialog):
         choose_subtracted_label = QtWidgets.QLabel()
         choose_subtracted_label.setText('Choose a .csv that have been subtracted:')
         choose_subtracted_label.setFont(font)
-        self.file_edit = QtWidgets.QLineEdit()
-        subtracted_button = QtWidgets.QToolButton()
-        subtracted_button.setText('...')
-        subtracted_button.setFont(font)
-        subtracted_button.clicked.connect(self.set_file)
+        self.file_edit = QtWidgets.QComboBox()
+        self.file_edit.addItems(self.parent.opened_csv)
+        # subtracted_button = QtWidgets.QToolButton()
+        # subtracted_button.setText('...')
+        # subtracted_button.setFont(font)
+        # subtracted_button.clicked.connect(self.set_file)
 
         file_choose_layout.addWidget(self.file_edit)
-        file_choose_layout.addWidget(subtracted_button)
+        # file_choose_layout.addWidget(subtracted_button)
         files_layout.addWidget(choose_subtracted_label)
         files_layout.addLayout(file_choose_layout)
 
@@ -317,44 +318,56 @@ class match_parawindow1(QtWidgets.QDialog):
             self.file_edit.setText(file)
 
     def nl(self):
-        try:
-            path = self.file_edit.text()
-            nl = float(self.nl_set.text())
-            rt_win = float(self.rt_window.text())
-            mz_win = float(self.mz_window.text())
-            self.close()
-
-            # TODO:确认rt和mz的单位
-            worker = Worker('Neutral loss matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
-            worker.signals.result.connect(partial(self.result_to_csv, 'NL.csv'))
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            self._thread_pool.start(worker)
-        except ValueError:
-            # popup window with exception
+        path = self.file_edit.currentText()
+        if len(path) == 0:
             msg = QtWidgets.QMessageBox(self)
-            msg.setText("Check parameters, something is wrong!")
+            msg.setText("Choose a file to process!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
+        else:
+            try:
+                nl = float(self.nl_set.text())
+                rt_win = float(self.rt_window.text())
+                mz_win = float(self.mz_window.text())
+                self.close()
+
+                # TODO:确认rt和mz的单位
+                worker = Worker('Neutral loss matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
+                worker.signals.result.connect(partial(self.result_to_csv, path+'_NL.csv'))
+                worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+                self._thread_pool.start(worker)
+            except ValueError:
+                # popup window with exception
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Check parameters, something is wrong!")
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
 
     def isotope(self):
-        try:
-            path = self.file_edit.text()
-            nl = float(self.nl_set.text())
-            rt_win = float(self.rt_window.text())
-            mz_win = float(self.mz_window.text())
-            self.close()
-
-            # TODO:确认rt和mz的单位
-            worker = Worker('Isotope feature matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
-            worker.signals.result.connect(partial(self.result_to_csv, 'isotope.csv'))
-            worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
-            self._thread_pool.start(worker)
-        except ValueError:
-            # popup window with exception
+        path = self.file_edit.currentText()
+        if len(path) == 0:
             msg = QtWidgets.QMessageBox(self)
-            msg.setText("Check parameters, something is wrong!")
+            msg.setText("Choose a file to process!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
+        else:
+            try:
+                nl = float(self.nl_set.text())
+                rt_win = float(self.rt_window.text())
+                mz_win = float(self.mz_window.text())
+                self.close()
+
+                # TODO:确认rt和mz的单位
+                worker = Worker('Isotope feature matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
+                worker.signals.result.connect(partial(self.result_to_csv, path+'_isotope.csv'))
+                worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+                self._thread_pool.start(worker)
+            except ValueError:
+                # popup window with exception
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Check parameters, something is wrong!")
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
 
     def save_as_txt(self, filename, arr):
         with open(filename, 'w') as file:
@@ -367,6 +380,7 @@ class match_parawindow1(QtWidgets.QDialog):
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
         self.parent._list_of_processed.addFile(name)
+        self.parent.opened_csv.append(name)
 
 
 class match_parawindow2(QtWidgets.QDialog):
@@ -397,28 +411,30 @@ class match_parawindow2(QtWidgets.QDialog):
         choose_mzxml_label = QtWidgets.QLabel()
         choose_mzxml_label.setText('Choose a *.mzxml to obtain MS2 data:')
         choose_mzxml_label.setFont(self.font_title)
-        self.mzxml_edit = QtWidgets.QLineEdit()
+        self.mzxml_edit = QtWidgets.QComboBox()
+        self.mzxml_edit.addItems(self.parent.opened_mzxml)
         self.mzxml_edit.setFont(self.font_input)
-        mzxml_button = QtWidgets.QToolButton()
-        mzxml_button.setText('...')
-        mzxml_button.setFont(self.font_title)
-        mzxml_button.clicked.connect(self.set_mzxml)
+        # mzxml_button = QtWidgets.QToolButton()
+        # mzxml_button.setText('...')
+        # mzxml_button.setFont(self.font_title)
+        # mzxml_button.clicked.connect(self.set_mzxml)
 
         # 选择经过第三步处理的csv
         choose_subtracted_label = QtWidgets.QLabel()
         choose_subtracted_label.setText('Choose a *.csv that have been subtracted:')
         choose_subtracted_label.setFont(self.font_title)
-        self.subtracted_edit = QtWidgets.QLineEdit()
+        self.subtracted_edit = QtWidgets.QComboBox()
+        self.subtracted_edit.addItems(self.parent.opened_csv)
         self.subtracted_edit.setFont(self.font_input)
-        subtracted_button = QtWidgets.QToolButton()
-        subtracted_button.setText('...')
-        subtracted_button.setFont(self.font_title)
-        subtracted_button.clicked.connect(self.set_subtracted)
+        # subtracted_button = QtWidgets.QToolButton()
+        # subtracted_button.setText('...')
+        # subtracted_button.setFont(self.font_title)
+        # subtracted_button.clicked.connect(self.set_subtracted)
 
         mzxml_choose_layout.addWidget(self.mzxml_edit)
-        mzxml_choose_layout.addWidget(mzxml_button)
+        # mzxml_choose_layout.addWidget(mzxml_button)
         subtracted_choose_layout.addWidget(self.subtracted_edit)
-        subtracted_choose_layout.addWidget(subtracted_button)
+        # subtracted_choose_layout.addWidget(subtracted_button)
         files_layout.addWidget(choose_mzxml_label)
         files_layout.addLayout(mzxml_choose_layout)
         files_layout.addWidget(choose_subtracted_label)
@@ -500,60 +516,66 @@ class match_parawindow2(QtWidgets.QDialog):
         layout.addLayout(para_layout)
         self.setLayout(layout)
 
-    def set_mzxml(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'mzxml(*.mzxml)')
-        if file:
-            self.mzxml_edit.setText(file)
-
-    def set_subtracted(self):
-        file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
-        if file:
-            self.subtracted_edit.setText(file)
+    # def set_mzxml(self):
+    #     file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'mzxml(*.mzxml)')
+    #     if file:
+    #         self.mzxml_edit.setText(file)
+    #
+    # def set_subtracted(self):
+    #     file, _ = QtWidgets.QFileDialog.getOpenFileName(None, None, None, 'csv(*.csv)')
+    #     if file:
+    #         self.subtracted_edit.setText(file)
 
     def fragment(self):
-        try:
-            mode = self.logic_choose.currentText()
-            path1 = self.mzxml_edit.text()
-            path2 = self.subtracted_edit.text()
-            fragment = self.fragment_set.text()
-            rt_win = float(self.rt_window.text())
-            mz_win = float(self.mz_window.text())
-            print(fragment)
-            # values = fragment.split(',')
-            # tar1 = float(values[0])
-            # tar2 = float(values[1])
+        self.path1 = self.mzxml_edit.currentText()
+        self.path2 = self.subtracted_edit.currentText()
+        if len(self.path1) == 0 or len(self.path2) == 0:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Choose a file to process!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+        else:
+            try:
+                mode = self.logic_choose.currentText()
+                fragment = self.fragment_set.text()
+                rt_win = float(self.rt_window.text())
+                mz_win = float(self.mz_window.text())
+                print(fragment)
+                # values = fragment.split(',')
+                # tar1 = float(values[0])
+                # tar2 = float(values[1])
 
-            if mode == 'all of them':
-                self.close()
-                worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-                worker.signals.result.connect(partial(self.all, path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
-                worker.signals.close_signal.connect(worker.progress_dialog.close)
-                self._thread_pool.start(worker)
-            elif mode == 'one of them':
-                self.close()
-                worker = Worker('Fragment feature matching...', obtain_MS2, path1)
-                worker.signals.result.connect(partial(self.one, path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
-                worker.signals.close_signal.connect(worker.progress_dialog.close)
-                self._thread_pool.start(worker)
-            else:
+                if mode == 'all of them':
+                    self.close()
+                    worker = Worker('Fragment feature matching...', obtain_MS2, self.path1)
+                    worker.signals.result.connect(partial(self.all, self.path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
+                    worker.signals.close_signal.connect(worker.progress_dialog.close)
+                    self._thread_pool.start(worker)
+                elif mode == 'one of them':
+                    self.close()
+                    worker = Worker('Fragment feature matching...', obtain_MS2, self.path1)
+                    worker.signals.result.connect(partial(self.one, self.path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
+                    worker.signals.close_signal.connect(worker.progress_dialog.close)
+                    self._thread_pool.start(worker)
+                else:
+                    msg = QtWidgets.QMessageBox(self)
+                    msg.setText("Choose to contain ALL or ONE of the fragment m/z values")
+                    msg.setFont(self.font_input)
+                    msg.setIcon(QtWidgets.QMessageBox.Warning)
+                    msg.exec_()
+            except ValueError:
+                # popup window with exception
                 msg = QtWidgets.QMessageBox(self)
-                msg.setText("Choose to contain ALL or ONE of the fragment m/z values")
+                msg.setText("Check parameters, something is wrong!")
                 msg.setFont(self.font_input)
                 msg.setIcon(QtWidgets.QMessageBox.Warning)
                 msg.exec_()
-        except ValueError:
-            # popup window with exception
-            msg = QtWidgets.QMessageBox(self)
-            msg.setText("Check parameters, something is wrong!")
-            msg.setFont(self.font_input)
-            msg.setIcon(QtWidgets.QMessageBox.Warning)
-            msg.exec_()
 
     def all(self, result, path2, fragments, tol_mz, tol_rt):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 链接逻辑all函数
-        worker2.signals.result.connect(partial(self.result_to_csv, 'fragment_all.csv'))
+        worker2.signals.result.connect(partial(self.result_to_csv, self.path1+'_fragment_all.csv'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -561,7 +583,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 连接逻辑or函数
-        worker2.signals.result.connect(partial(self.result_to_csv, 'fragment_one.csv'))
+        worker2.signals.result.connect(partial(self.result_to_csv, self.path1+'_fragment_one.csv'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -576,6 +598,7 @@ class match_parawindow2(QtWidgets.QDialog):
     def result_to_csv(self, name, df):
         df.to_csv(name, index=False)
         self.parent._list_of_processed.addFile(name)
+        self.parent.opened_csv.append(name)
 
 
 class ProgressBarsListItem(QtWidgets.QWidget):
