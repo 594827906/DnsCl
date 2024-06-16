@@ -84,11 +84,11 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         'intensity': record_intensity
     })
 
-    output['label'] = 0
+    # output['label'] = 0
     label = 0
     # unique_mz = output['mz'].unique()  # 获取唯一的mz值
     t1 = time.time()
-    # 遍历每一行，用时155秒
+    # v1:遍历每一行，用时155秒
     # for i in range(1, len(output)):
     #     if output.loc[i, 'mz'] != output.loc[i - 1, 'mz']:  # 如果当前行的mz与前一行不同，label+1
     #         if (output.loc[i, 'mz'] - output.loc[i - 1, 'mz']) > tol_mass:  # 这一步还有必要加吗？
@@ -96,13 +96,16 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
     #     elif output.loc[i, 'scan'] - output.loc[i - 1, 'scan'] > 10:  # 如果当前行的scan与前一行的scan差值大于n，label+1
     #         label += 1
     #     output.loc[i, 'peakLabel'] = label  # 更新当前行的label
-    grouped = output.groupby('mz')  # 对mz分组后判断，用时126秒
+
+    # v2:对mz分组后组内逐行覆盖标签，用时126秒
+    grouped = output.groupby('mz')
     for name, group in grouped:
-        # 对每个mz组内的数据按scan进行判断
+        output.loc[group.index, 'label'] = label
+        # v3:组内找到断点后对剩余label统一更新，避免逐行做加法，用时61秒
         for i in range(1, len(group)):
             if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > 5:
                 label += 1
-            output.loc[group.index[i], 'label'] = label
+                output.loc[group.index[i:], 'label'] = label
         label += 1  # 每个mz组结束后，增加label
     t2 = time.time()
     print('processing:', t1-t0)
