@@ -28,7 +28,7 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
         ind_nl = np.where(nlmass == i)[0]
         ind_matched = np.where(np.abs(mass-i)/i <= mz_tol)[0]
         # print('matched mass:', np.unique(mass[ind_matched]))
-        
+
         # if >2 matched
         if np.size(ind_matched) > 0:
             # print(len(mass[ind_matched]))
@@ -40,7 +40,7 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
                     intensity_nl = intensity[mass == m]
                     # 判断条件：m与p的rt差
                     condition = np.abs(rt_nl[np.argmax(intensity_nl)]-rt_matched[np.argmax(intensity_matched)])
-                            
+
                     if condition <= rt_tol:
                         num_peak += 1
                         # 修改：符合条件的，获得母离子索引ind_nl
@@ -69,7 +69,7 @@ def obtain_MS2(mzXML_file):
             MS2intensity_array.append(list(spec['intensity array']))  # 离子强度
             MS2mz_array.append(list(spec['m/z array']))  # 质量数
             MS2precusormz.append(spec['precursorMz'][0]['precursorMz'])
-        
+
     # 构造dataframe数组
     output = pd.DataFrame({
         'MS1scan': precursorScans,
@@ -137,8 +137,8 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
             if np.abs(max_rt - rt_list[i]) <= tol_rt:
                 match_mz.extend(mz_den[ind])
                 rows_to_add.extend(ind)
-    nl_df = input_df.loc[rows_to_add]
-    return nl_df  # np.unique(match_mz)用于验证
+    fragment_df = input_df.loc[rows_to_add]
+    return fragment_df  # np.unique(match_mz)用于验证
 
 
 def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或逻辑
@@ -182,9 +182,8 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
             if np.abs(max_rt - rt_list[i]) <= tol_rt:
                 match_mz.extend(mz_den[ind])
                 rows_to_add.extend(ind)
-    nl_df = input_df.loc[rows_to_add]
-    return nl_df  # np.unique(match_mz)用于验证
-
+    fragment_df = input_df.loc[rows_to_add]
+    return fragment_df  # np.unique(match_mz)用于验证
 
 # ------------- main ----------------#
 # t0 = time.time()

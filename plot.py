@@ -6,7 +6,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
 from background_subtract import denoise_bg
-from peak_extraction import neut_loss, obtain_MS2, match_all_MS2, match_one_MS2
+from peak_extraction_by_scan import neut_loss, obtain_MS2, match_all_MS2, match_one_MS2
 from view_from_processed import tic_from_csv
 import pyteomics.mzxml as mzxml
 import numpy as np
@@ -529,6 +529,7 @@ class match_parawindow2(QtWidgets.QDialog):
     def fragment(self):
         self.path1 = self.mzxml_edit.currentText()
         self.path2 = self.subtracted_edit.currentText()
+        self.filename = os.path.basename(self.path1)
         if len(self.path1) == 0 or len(self.path2) == 0:
             msg = QtWidgets.QMessageBox(self)
             msg.setText("Choose a file to process!")
@@ -575,7 +576,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 链接逻辑all函数
-        worker2.signals.result.connect(partial(self.result_to_csv, self.path1+'_fragment_all.csv'))
+        worker2.signals.result.connect(partial(self.result_to_csv, self.filename+'_fragment_all.csv'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -583,7 +584,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 连接逻辑or函数
-        worker2.signals.result.connect(partial(self.result_to_csv, self.path1+'_fragment_one.csv'))
+        worker2.signals.result.connect(partial(self.result_to_csv, self.filename+'_fragment_one.csv'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
