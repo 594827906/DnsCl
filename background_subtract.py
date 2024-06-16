@@ -2,12 +2,13 @@
 # -*- coding: gbk -*-
 import pandas as pd
 import numpy as np
+import time
 
 
 def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
     blk_df = pd.read_csv(blank)
     sam_df = pd.read_csv(sample)
-
+    t0 = time.time()
     mass_blk = np.array(blk_df['mz'])
     mass_blk_uni = np.unique(mass_blk)  # list of mz in blank
     rt_blk = np.array(blk_df['RT'])
@@ -18,7 +19,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
     mass_sam = np.array(sam_df['mz'])
     mass_sam_uni = np.unique(mass_sam)  # list of mz in sample
     rt_sam = np.array(sam_df['RT'])
-    peaklab_sam = np.array(sam_df['peakLabel'])
+    label_sam = np.array(sam_df['peakLabel'])
     intensity_sam = np.array(sam_df['intensity'])
     scan_sam = np.array(sam_df['scan'])
 
@@ -32,11 +33,10 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         ind_of_sample = np.where(mass_sam == mass_sam_uni[i])[0]  # index of a unique mz on sample
         lower_bound = mass_sam_uni[i] - mass_sam_uni[i] * tol_mass
         upper_bound = mass_sam_uni[i] + mass_sam_uni[i] * tol_mass
-        is_in_range = np.any((mass_blk_uni >= lower_bound) & (mass_blk_uni <= upper_bound))
-        plab_sample = peaklab_sam[ind_of_sample]
+        is_in_range = np.any((mass_blk_uni >= lower_bound) & (mass_blk_uni <= upper_bound))  # 该mz在blank中存在容差内的值
         # print('peaklabel of sample:', np.unique(plab_sample))
 
-        if not is_in_range:  # if unmatch
+        if not is_in_range:  # 如果blank没有，直接添加
             # print('inexistent within blank',scan_sam[ind_of_sample])
             retain_scan.extend(scan_sam[ind_of_sample])
             record_mass.extend(mass_sam[ind_of_sample])
@@ -44,7 +44,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
             record_intensity.extend(intensity_sam[ind_of_sample])
 
         else:
-            # ind possibly exist 2 values
+            # 该mz在blank中存在容差内的值可能不止一个
             ind_all = np.where((mass_blk_uni >= lower_bound) & (mass_blk_uni <= upper_bound))[0]
             for j in range(len(mass_blk_uni[ind_all])):
 
@@ -77,11 +77,36 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
                         record_intensity.append(intensity_sam[ind_of_sample][m])
 
     output = pd.DataFrame({
+        'label': 0,
         'scan': retain_scan,
         'RT': np.round(record_rt, 4),
         'mz': np.round(record_mass, 5),
         'intensity': record_intensity
     })
+
+    output['label'] = 0
+    label = 0
+    # unique_mz = output['mz'].unique()  # 获取唯一的mz值
+    t1 = time.time()
+    # 遍历每一行，用时155秒
+    # for i in range(1, len(output)):
+    #     if output.loc[i, 'mz'] != output.loc[i - 1, 'mz']:  # 如果当前行的mz与前一行不同，label+1
+    #         if (output.loc[i, 'mz'] - output.loc[i - 1, 'mz']) > tol_mass:  # 这一步还有必要加吗？
+    #             label += 1
+    #     elif output.loc[i, 'scan'] - output.loc[i - 1, 'scan'] > 10:  # 如果当前行的scan与前一行的scan差值大于n，label+1
+    #         label += 1
+    #     output.loc[i, 'peakLabel'] = label  # 更新当前行的label
+    grouped = output.groupby('mz')  # 对mz分组后判断，用时126秒
+    for name, group in grouped:
+        # 对每个mz组内的数据按scan进行判断
+        for i in range(1, len(group)):
+            if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > 5:
+                label += 1
+            output.loc[group.index[i], 'label'] = label
+        label += 1  # 每个mz组结束后，增加label
+    t2 = time.time()
+    print('processing:', t1-t0)
+    print('peak picking:', t2-t1)
     return output
 
 
