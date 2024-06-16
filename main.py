@@ -1,5 +1,8 @@
 import sys
 import os
+
+import matplotlib.pyplot as plt
+
 from plot import PlotWindow, match_parawindow1, match_parawindow2
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
@@ -7,6 +10,7 @@ from utils.threading import Worker
 from preprocess import defect_process
 from background_subtract import denoise_bg
 from show_eic_window import eic_window, ClickableListWidget
+from view_from_processed import tic_from_csv
 
 
 class MainWindow(PlotWindow):
@@ -277,11 +281,13 @@ class ProcessedListMenu(QtWidgets.QMenu):
 
         top = QtWidgets.QAction('Plot at the top', parent)
         bottom = QtWidgets.QAction('Plot at the bottom', parent)
+        export = QtWidgets.QAction('Export TIC as picture', parent)
         clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
         menu.addAction(top)
         menu.addAction(bottom)
+        menu.addAction(export)
         menu.addAction(clear)
         menu.addAction(close)
 
@@ -297,6 +303,26 @@ class ProcessedListMenu(QtWidgets.QMenu):
                 plotted, path = self.parent.plot_processed(file, mode='bottom')
                 if plotted:
                     self.parent.mzxml_plotted_list.append(path)
+
+        if action == export:
+            for file in self.get_selected_files():
+                file = file.text()
+                name, extension = os.path.splitext(file)
+                label = f'{file}'
+                obj = tic_from_csv(file, label=label, mode='Exporting picture...')
+                x = obj['x']
+                y = obj['y']
+                plt.figure(figsize=(len(x)/100, 5))
+                plt.xlabel('Retention time [min]')
+                plt.ylabel('Intensity')
+                plt.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
+                plt.plot(x, y, label=obj['label'])
+                plt.ylim(bottom=0)
+                plt.legend(loc='best')
+                plt.grid(alpha=0.8)
+                plt.savefig(name+'_plot.pdf', dpi=300)
+                plt.savefig(name+'_plot.png', dpi=300)
+                plt.show()
 
         if action == close:
             self.close_files()
