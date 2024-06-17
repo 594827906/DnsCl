@@ -122,64 +122,32 @@ class eic_window(QtWidgets.QDialog):
         return chosen_item
 
     def plot_chosen(self, row, column):
-        # 获取对应的 DataFrame 行数据
-        row_data = self.df.iloc[row]
+        try:
+            # 获取对应的 DataFrame 行数据
+            row_data = self.df.iloc[row]
 
-        mz = row_data['mz']
-        inten_sam = row_data['intensity (Sample)']
-        inten_blk = row_data['intensity (Blank)']
-        RT = row_data['RT']
-        RT_min = RT[0]
-        RT_max = RT[-1]
-        scan = row_data['scan']
-        eic_len = len(scan)
-        ext_blk = []
-        if isinstance(inten_blk, int):
-            for _ in range(eic_len):
-                ext_blk.append(0)
-        elif len(inten_blk) < eic_len:
-            max_pos_eic = np.argmax(inten_sam)
-            max_pos_blk = np.argmax(inten_blk)
+            mz = row_data['mz']
+            intensity = row_data['intensity']
+            RT = row_data['RT']
+            RT_min = RT[0]
+            RT_max = RT[-1]
+            scan = row_data['scan']
+            # print(ext_blk)
 
-            # 计算位置偏移量
-            offset = max_pos_blk - max_pos_eic
-
-            # 创建新的数组，并初始化为零
-            ext_blk = np.zeros(eic_len, dtype=max_pos_blk.dtype)
-
-            if offset >= 0:
-                if len(inten_blk) + abs(offset) <= eic_len:
-                    ext_blk[:len(inten_blk)] = inten_blk
-                else:
-                    if max_pos_eic >= eic_len // 2:
-                        ext_blk[eic_len - len(inten_blk):] = inten_blk
-                    else:
-                        ext_blk[:eic_len - len(inten_blk)] = inten_blk
-            else:
-                if len(inten_blk) + abs(offset) <= eic_len:
-                    ext_blk[-offset:-offset + len(inten_blk)] = inten_blk
-                else:
-                    if max_pos_eic >= eic_len // 2:
-                        ext_blk[eic_len - len(inten_blk):] = inten_blk
-                    else:
-                        ext_blk[:eic_len - len(inten_blk)] = inten_blk
-        else:
-            ext_blk = inten_blk
-        # print(ext_blk)
-
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        ax.set_ylabel('Intensity')
-        ax.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
-        ax.plot(scan, inten_sam, color='darkorange', label='sample')
-        ax.plot(scan, ext_blk, color='royalblue', label='blank')
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # x轴只显示整数
-        title = f'mz = {mz:.3f}, rt = {RT_min:.1f} - {RT_max:.1f}'
-        ax.set_title(title)
-        ax.legend(loc='best')
-        ax.grid(alpha=0.8)
-        self.canvas.draw()
-        self.current_flag = False
+            self.figure.clear()
+            ax = self.figure.add_subplot(111)
+            ax.set_ylabel('Intensity')
+            ax.ticklabel_format(axis='y', scilimits=(0, 0))  # 使用科学计数法
+            ax.plot(scan, intensity)
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # x轴只显示整数
+            title = f'mz = {mz:.3f}, rt = {RT_min:.1f} - {RT_max:.1f}'
+            ax.set_title(title)
+            # ax.legend(loc='best')
+            ax.grid(alpha=0.8)
+            self.canvas.draw()
+            self.current_flag = False
+        except Exception:
+            pass
 
 
 class FileContextMenu(QtWidgets.QMenu):
