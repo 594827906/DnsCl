@@ -2,7 +2,7 @@ import sys
 import os
 
 import matplotlib.pyplot as plt
-
+import pandas as pd
 from plot import PlotWindow, match_parawindow1, match_parawindow2
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
@@ -282,12 +282,14 @@ class ProcessedListMenu(QtWidgets.QMenu):
         top = QtWidgets.QAction('Plot at the top', parent)
         bottom = QtWidgets.QAction('Plot at the bottom', parent)
         export = QtWidgets.QAction('Export TIC as picture', parent)
+        eic = QtWidgets.QAction('Show EIC window', parent)
         clear = QtWidgets.QAction('Clear plot', parent)
         close = QtWidgets.QAction('Close', parent)
 
         menu.addAction(top)
         menu.addAction(bottom)
         menu.addAction(export)
+        menu.addAction(eic)
         menu.addAction(clear)
         menu.addAction(close)
 
@@ -323,6 +325,19 @@ class ProcessedListMenu(QtWidgets.QMenu):
                 plt.savefig(name+'_plot.pdf', dpi=300)
                 plt.savefig(name+'_plot.png', dpi=300)
                 plt.show()
+
+        if action == eic:
+            for file in self.get_selected_files():
+                file = file.text()
+                df = pd.read_csv(file)
+                grouped = df.groupby('label').apply(lambda x: pd.Series({
+                    'mz': x.iloc[0]['mz'],
+                    'scan': list(x['scan']),
+                    'intensity': list(x['intensity']),
+                    'RT': [x.iloc[0]['RT'], x.iloc[-1]['RT']]
+                })).reset_index()
+                subwindow = eic_window(self, grouped)
+                subwindow.show()
 
         if action == close:
             self.close_files()
@@ -609,8 +624,9 @@ class defect_parawindow(QtWidgets.QDialog):
             try:
                 file_name = os.path.basename(self.path)
                 name, extension = os.path.splitext(file_name)
-                worker = Worker('Simplifying... (may take a few minutes)', defect_process, self.path, self.lower_rt, self.upper_rt,
-                                self.lower_mz, self.upper_mz, self.intensity_thd, self.lower_mass, self.upper_mass)
+                worker = Worker('Simplifying... (may take a few minutes)', defect_process, self.path,
+                                self.lower_rt, self.upper_rt, self.lower_mz, self.upper_mz, self.intensity_thd,
+                                self.lower_mass, self.upper_mass, self.mass_tolerance*10e-7)
                 worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified.csv'))
                 # worker.signals.result.connect(self.start_sample)
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
