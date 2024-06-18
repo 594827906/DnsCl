@@ -178,16 +178,10 @@ class MainWindow(PlotWindow):
     def _saving_path(self):
         try:
             directory = str(QtWidgets.QFileDialog.getExistingDirectory(self, 'Choose a directory to save result'))
-            if len(directory) == 0:
-                msg = QtWidgets.QMessageBox(self)
-                msg.setText("Select a directory to set path!")
-                msg.setIcon(QtWidgets.QMessageBox.Warning)
-                msg.exec_()
-            else:
-                os.chdir(directory)
+            os.chdir(directory)
         except Exception:
             msg = QtWidgets.QMessageBox(self)
-            msg.setText("Something wrong")
+            msg.setText("Fail to change path")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
 
@@ -764,11 +758,28 @@ class denoise_parawindow(QtWidgets.QDialog):
         ratio_layout.addWidget(ratio_text)
         ratio_layout.addStretch()  # 什么用处？
 
+        breakpoint_setting = QtWidgets.QFormLayout()
+        breakpoint_setting.alignment()
+
+        breakpoint_label = QtWidgets.QLabel("Cut the section at： ")
+        breakpoint_label.setFont(font)
+        self.breakpoint = QtWidgets.QLineEdit()
+        self.breakpoint.setText('10')
+        self.breakpoint.setFixedSize(50, 30)
+        self.breakpoint.setFont(font)
+        breakpoint_layout = QtWidgets.QHBoxLayout()
+        breakpoint_text = QtWidgets.QLabel(self)
+        breakpoint_text.setText('breakpoints')
+        breakpoint_text.setFont(font)
+        breakpoint_layout.addWidget(self.breakpoint)
+        breakpoint_layout.addWidget(breakpoint_text)
+
         range_setting.addRow(rt_label, rt_layout)
         range_setting.addRow(mz_label, mz_layout)
         # range_setting.setLabelAlignment(Q)
 
         ratio_setting.addRow(ratio_label, ratio_layout)
+        breakpoint_setting.addRow(breakpoint_label, breakpoint_layout)
 
         ok_button = QtWidgets.QPushButton('OK')
         ok_button.clicked.connect(self.denoise)
@@ -778,6 +789,7 @@ class denoise_parawindow(QtWidgets.QDialog):
         para_layout = QtWidgets.QVBoxLayout()
         para_layout.addLayout(range_setting)
         para_layout.addLayout(ratio_setting)
+        para_layout.addLayout(breakpoint_setting)
         para_layout.addWidget(ok_button)
 
         layout = QtWidgets.QVBoxLayout()
@@ -808,12 +820,13 @@ class denoise_parawindow(QtWidgets.QDialog):
                 rt_win = float(self.rt_window.text())
                 mz_win = float(self.mz_window.text())
                 ratio = float(self.ratio.text())
+                breakpoint = int(self.breakpoint.text())
                 sample_name = os.path.basename(sample)
                 name, extension = os.path.splitext(sample_name)
                 self.close()
 
                 worker = Worker('Background subtract denoising...', denoise_bg,
-                                blank, sample, mz_win*10e-7, rt_win/60, ratio)
+                                blank, sample, mz_win*10e-7, rt_win/60, ratio, n=breakpoint)
                 worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised.csv'))
                 # worker.signals.result.connect(self.view_eic)
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数

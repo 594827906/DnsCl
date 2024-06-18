@@ -5,21 +5,21 @@ import numpy as np
 import time
 
 
-def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
+def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10):  # TODO：有bug，会把前面的加到后面去？？
     blk_df = pd.read_csv(blank)
     sam_df = pd.read_csv(sample)
     t0 = time.time()
     mass_blk = np.array(blk_df['mz'])
     mass_blk_uni = np.unique(mass_blk)  # list of mz in blank
     rt_blk = np.array(blk_df['RT'])
-    peaklab_blk = np.array(blk_df['peakLabel'])
+    # peaklab_blk = np.array(blk_df['label'])
     intensity_blk = np.array(blk_df['intensity'])
     scan_blk = np.array(blk_df['scan'])
 
     mass_sam = np.array(sam_df['mz'])
     mass_sam_uni = np.unique(mass_sam)  # list of mz in sample
     rt_sam = np.array(sam_df['RT'])
-    label_sam = np.array(sam_df['peakLabel'])
+    # label_sam = np.array(sam_df['label'])
     intensity_sam = np.array(sam_df['intensity'])
     scan_sam = np.array(sam_df['scan'])
 
@@ -34,7 +34,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         lower_bound = mass_sam_uni[i] - mass_sam_uni[i] * tol_mass
         upper_bound = mass_sam_uni[i] + mass_sam_uni[i] * tol_mass
         is_in_range = np.any((mass_blk_uni >= lower_bound) & (mass_blk_uni <= upper_bound))  # 该mz在blank中存在容差内的值
-        # print('peaklabel of sample:', np.unique(plab_sample))
+        # print('label of sample:', np.unique(plab_sample))
 
         if not is_in_range:  # 如果blank没有，直接添加
             # print('inexistent within blank',scan_sam[ind_of_sample])
@@ -103,7 +103,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10):
         output.loc[group.index, 'label'] = label
         # v3:组内找到断点后对剩余label统一更新，避免逐行做加法，用时61秒
         for i in range(1, len(group)):
-            if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > 5:
+            if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > n:
                 label += 1
                 output.loc[group.index[i:], 'label'] = label
         label += 1  # 每个mz组结束后，增加label
