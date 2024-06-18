@@ -54,10 +54,14 @@ class MainWindow(PlotWindow):
         mzxml_import = QtWidgets.QAction('Open *.mzXML', self)
         mzxml_import.triggered.connect(self._open_mzxml)
         file.addAction(mzxml_import)
-        # 直接导入处理过的文件(csv)
+        # 导入处理过的文件(csv)
         csv_import = QtWidgets.QAction('Open processed file (*.csv)', self)
         csv_import.triggered.connect(self._open_csv)
         file.addAction(csv_import)
+        # 选择保存目录
+        save_path = QtWidgets.QAction('Choose a directory as default saving path', self)
+        save_path.triggered.connect(self._saving_path)
+        file.addAction(save_path)
 
         # file_export = QtWidgets.QMenu('Save', self)
         # # 导出当前图谱为图片
@@ -170,6 +174,22 @@ class MainWindow(PlotWindow):
         for name in files_names:
             self._list_of_processed.addFile(name)
             self.opened_csv.append(name)
+
+    def _saving_path(self):
+        try:
+            directory = str(QtWidgets.QFileDialog.getExistingDirectory(self, 'Choose a directory to save result'))
+            if len(directory) == 0:
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Select a directory to set path!")
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
+            else:
+                os.chdir(directory)
+        except Exception:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Something wrong")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
 
     def _export_features(self, mode):
         if self._list_of_mzxml.count() > 0:
