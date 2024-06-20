@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import pyteomics.mzxml as mzxml
 import math
+import time
 
 
 # -----------output MS1 spectra-------------- #
@@ -148,9 +149,8 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
     scan = np.array(data['scan'])
     rt = np.array(data['RT'])
     mass = np.array(data['mz'])
-    # feat_labels = np.array(data['peakLabel'])
+    # feat_labels = np.array(data['label'])
     update_data = pd.DataFrame()
-
     # if this mass existed on 7 scans of range 10
     reset_scan = scan - np.min(scan)
     tag = np.array([False] * (np.max(scan) - np.min(scan) + 1))
@@ -186,11 +186,11 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
 
                 if (np.max(test_intensity) - np.min(test_intensity)) / np.min(test_intensity) > var_ratio:
                     temp = pd.DataFrame({
+                        'label': np.array(feat_labels[feat_labels == i]),
                         'scan': scan4var[feat_labels == i],
                         'RT': rt4var[feat_labels == i],
-                        'intensity': test_intensity,
-                        'peakLabel': np.array(feat_labels[feat_labels == i]),
-                        'mz': mass4var[feat_labels == i]
+                        'mz': mass4var[feat_labels == i],
+                        'intensity': test_intensity
                     })
                     update_data = pd.concat([update_data, temp], ignore_index=True)
 
@@ -199,20 +199,21 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
 
 def check_rep_var(input_df):
     # initial peak label
-    input_df['peakLabel'] = np.array([0] * len(input_df))
-
+    input_df['label'] = np.array([0] * len(input_df))
+    t0 = time.time()
     # grouping mass
     grouped_data = input_df.groupby('mz').apply(refine_group)
-
+    t1 = time.time()
+    print("mz group", t1 - t0)
     return grouped_data
 
 
-def defect_process(file, lower_rt, upper_rt, lower_mz, upper_mz, intensity_thd, lower_mass, upper_mass):
+def defect_process(file, lower_rt, upper_rt, lower_mz, upper_mz, intensity_thd, lower_mass, upper_mass, mass_tol):
     df = obtain_MS1(file)
     df = RT_screening(df, lower_rt=lower_rt, upper_rt=upper_rt)
     df = mz_screening(df, lower_mz=lower_mz, upper_mz=upper_mz)
     df = intens_screening(df, lower_inten=intensity_thd)
     df = mass_def(df, lower_mass=lower_mass, upper_mass=upper_mass)
-    df = bin_peaks(df)
+    df = bin_peaks(df, tol=mass_tol)
     df = check_rep_var(df)
     return df

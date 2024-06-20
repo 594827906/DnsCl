@@ -84,6 +84,8 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
         'intensity': record_intensity
     })
 
+    output_unique = output.drop_duplicates(subset=['scan', 'mz'])
+
     # output['label'] = 0
     label = 0
     # unique_mz = output['mz'].unique()  # 获取唯一的mz值
@@ -98,19 +100,19 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
     #     output.loc[i, 'peakLabel'] = label  # 更新当前行的label
 
     # v2:对mz分组后组内逐行覆盖标签，用时126秒
-    grouped = output.groupby('mz')
+    grouped = output_unique.groupby('mz')
     for name, group in grouped:
-        output.loc[group.index, 'label'] = label
+        output_unique.loc[group.index, 'label'] = label
         # v3:组内找到断点后对剩余label统一更新，避免逐行做加法，用时61秒
         for i in range(1, len(group)):
             if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > n:
                 label += 1
-                output.loc[group.index[i:], 'label'] = label
+                output_unique.loc[group.index[i:], 'label'] = label
         label += 1  # 每个mz组结束后，增加label
     t2 = time.time()
     print('processing:', t1-t0)
     print('peak picking:', t2-t1)
-    return output
+    return output_unique
 
 
 # read preprocessed data
