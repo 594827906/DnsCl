@@ -132,7 +132,20 @@ class eic_window(QtWidgets.QDialog):
             RT_min = RT[0]
             RT_max = RT[-1]
             scan = row_data['scan']
-            # print(ext_blk)
+            scan_min = scan[0]
+            scan_max = scan[-1]
+
+            diff = np.diff(scan)  # 计算相邻元素的差值
+            break_point = np.where(diff != 1)[0] + 1  # 找到差值不为1的索引，即不连续点的位置。+1是因为diff结果的长度比data短1
+            missing_point = diff[break_point - 1] - 1
+            missing_point = missing_point.astype(int)
+            offset = 0
+            for index, count in zip(break_point, missing_point):
+                for _ in range(count):
+                    scan = np.insert(scan, index + offset, 0)
+                    offset += 1
+                    intensity = np.insert(intensity, index + offset - 1, 0)
+            scan = np.arange(scan_min, scan_max + 1)
 
             self.figure.clear()
             ax = self.figure.add_subplot(111)

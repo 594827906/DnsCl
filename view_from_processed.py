@@ -21,12 +21,12 @@ def tic_from_csv(file, label, mode):  # 从处理后的csv中绘制TIC图
             t = df.loc[df['scan'] == scan, 'RT'].values[0]  # get scan time
             time.append(t)
         else:
-            if (df['scan'] == scan+1).any():
-                t = df.loc[df['scan'] == scan + 1, 'RT'].values[0]
-                time.append(t)
-                tic.append(0)
             if (df['scan'] == scan-1).any():
                 t = df.loc[df['scan'] == scan - 1, 'RT'].values[0]
+                time.append(t)
+                tic.append(0)
+            if (df['scan'] == scan+1).any():
+                t = df.loc[df['scan'] == scan + 1, 'RT'].values[0]
                 time.append(t)
                 tic.append(0)
 
