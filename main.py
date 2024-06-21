@@ -38,7 +38,7 @@ class MainWindow(PlotWindow):
             # 否则，使用脚本文件的路径
             executable_path = __file__
 
-            # 获取可执行文件所在的目录
+        # 获取可执行文件所在的目录
         executable_directory = os.path.dirname(os.path.abspath(executable_path))
 
         # 设置工作目录为可执行文件所在的目录
@@ -641,7 +641,7 @@ class defect_parawindow(QtWidgets.QDialog):
                 worker = Worker('Simplifying... (may take a few minutes)', defect_process, self.path,
                                 self.lower_rt, self.upper_rt, self.lower_mz, self.upper_mz, self.intensity_thd,
                                 self.lower_mass, self.upper_mass, self.mass_tolerance*10e-7)
-                worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified.csv'))
+                worker.signals.result.connect(partial(self.result_to_csv, name+'_simplified'))
                 # worker.signals.result.connect(self.start_sample)
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
                 self._thread_pool.start(worker)
@@ -660,9 +660,19 @@ class defect_parawindow(QtWidgets.QDialog):
     #     self._thread_pool.start(worker1)
 
     def result_to_csv(self, name, df):
-        df.to_csv(name, index=False)
-        self.parent._list_of_processed.addFile(name)
-        self.parent.opened_csv.append(name)  # TODO:现在添加的是文件名，增加选择保存目录的功能后，改为添加路径！！
+        suffix_start = 0
+        while True:
+            file_name = f"{name}-{suffix_start:02d}.csv"
+            if not os.path.exists(file_name):
+                df.to_csv(file_name, index=False)
+                break
+            else:
+                suffix_start += 1
+        self.parent._list_of_processed.addFile(file_name)
+        self.parent.opened_csv.append(file_name)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.exec_()
 
 
 class denoise_parawindow(QtWidgets.QDialog):
@@ -827,7 +837,7 @@ class denoise_parawindow(QtWidgets.QDialog):
 
                 worker = Worker('Background subtract denoising...', denoise_bg,
                                 blank, sample, mz_win*10e-7, rt_win/60, ratio, n=breakpoint)
-                worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised.csv'))
+                worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised'))
                 # worker.signals.result.connect(self.view_eic)
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
                 self._thread_pool.start(worker)
@@ -839,9 +849,19 @@ class denoise_parawindow(QtWidgets.QDialog):
                 msg.exec_()
 
     def result_to_csv(self, name, df):
-        df.to_csv(name, index=False)
-        self.parent._list_of_processed.addFile(name)
-        self.parent.opened_csv.append(name)
+        suffix_start = 0
+        while True:
+            file_name = f"{name}-{suffix_start:02d}.csv"
+            if not os.path.exists(file_name):
+                df.to_csv(file_name, index=False)
+                break
+            else:
+                suffix_start += 1
+        self.parent._list_of_processed.addFile(file_name)
+        self.parent.opened_csv.append(file_name)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.exec_()
 
     def view_eic(self, df):
         subwindow = eic_window(self, df)

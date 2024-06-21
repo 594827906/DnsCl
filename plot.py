@@ -329,11 +329,13 @@ class match_parawindow1(QtWidgets.QDialog):
                 nl = float(self.nl_set.text())
                 rt_win = float(self.rt_window.text())
                 mz_win = float(self.mz_window.text())
+                filename = os.path.basename(path)
+                name, extension = os.path.splitext(filename)
                 self.close()
 
                 # TODO:确认rt和mz的单位
                 worker = Worker('Neutral loss matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
-                worker.signals.result.connect(partial(self.result_to_csv, path+'_NL.csv'))
+                worker.signals.result.connect(partial(self.result_to_csv, name+'_NL'))
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
                 self._thread_pool.start(worker)
             except ValueError:
@@ -355,11 +357,13 @@ class match_parawindow1(QtWidgets.QDialog):
                 nl = float(self.nl_set.text())
                 rt_win = float(self.rt_window.text())
                 mz_win = float(self.mz_window.text())
+                filename = os.path.basename(path)
+                name, extension = os.path.splitext(filename)
                 self.close()
 
                 # TODO:确认rt和mz的单位
                 worker = Worker('Isotope feature matching...', neut_loss, path, NL=nl, mz_tol=mz_win*10e-7, rt_tol=rt_win/60)
-                worker.signals.result.connect(partial(self.result_to_csv, path+'_isotope.csv'))
+                worker.signals.result.connect(partial(self.result_to_csv, name+'_isotope'))
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
                 self._thread_pool.start(worker)
             except ValueError:
@@ -369,18 +373,20 @@ class match_parawindow1(QtWidgets.QDialog):
                 msg.setIcon(QtWidgets.QMessageBox.Warning)
                 msg.exec_()
 
-    def save_as_txt(self, filename, arr):
-        with open(filename, 'w') as file:
-            for item in arr:
-                file.write(f"{item}\n")
-        msg = QtWidgets.QMessageBox(self)
-        msg.setText("Result has been saved as " + filename + " successfully!")
-        msg.exec_()
-
     def result_to_csv(self, name, df):
-        df.to_csv(name, index=False)
-        self.parent._list_of_processed.addFile(name)
-        self.parent.opened_csv.append(name)
+        suffix_start = 0
+        while True:
+            file_name = f"{name}-{suffix_start:02d}.csv"
+            if not os.path.exists(file_name):
+                df.to_csv(file_name, index=False)
+                break
+            else:
+                suffix_start += 1
+        self.parent._list_of_processed.addFile(file_name)
+        self.parent.opened_csv.append(file_name)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.exec_()
 
 
 class match_parawindow2(QtWidgets.QDialog):
@@ -530,6 +536,7 @@ class match_parawindow2(QtWidgets.QDialog):
         self.path1 = self.mzxml_edit.currentText()
         self.path2 = self.subtracted_edit.currentText()
         self.filename = os.path.basename(self.path1)
+        self.name, extention = os.path.splitext(self.filename)
         if len(self.path1) == 0 or len(self.path2) == 0:
             msg = QtWidgets.QMessageBox(self)
             msg.setText("Choose a file to process!")
@@ -576,7 +583,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 链接逻辑all函数
-        worker2.signals.result.connect(partial(self.result_to_csv, self.filename+'_fragment_all.csv'))
+        worker2.signals.result.connect(partial(self.result_to_csv, self.name+'_fragment_all'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -584,7 +591,7 @@ class match_parawindow2(QtWidgets.QDialog):
         # 启动第二个后台任务处理 obtain_MS2 的结果
         worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
         # 连接逻辑or函数
-        worker2.signals.result.connect(partial(self.result_to_csv, self.filename+'_fragment_one.csv'))
+        worker2.signals.result.connect(partial(self.result_to_csv, self.name+'_fragment_one'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
@@ -597,9 +604,19 @@ class match_parawindow2(QtWidgets.QDialog):
         msg.exec_()
 
     def result_to_csv(self, name, df):
-        df.to_csv(name, index=False)
-        self.parent._list_of_processed.addFile(name)
-        self.parent.opened_csv.append(name)
+        suffix_start = 0
+        while True:
+            file_name = f"{name}-{suffix_start:02d}.csv"
+            if not os.path.exists(file_name):
+                df.to_csv(file_name, index=False)
+                break
+            else:
+                suffix_start += 1
+        self.parent._list_of_processed.addFile(file_name)
+        self.parent.opened_csv.append(file_name)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.exec_()
 
 
 class ProgressBarsListItem(QtWidgets.QWidget):
