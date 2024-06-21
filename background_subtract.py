@@ -5,7 +5,7 @@ import numpy as np
 import time
 
 
-def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10):  # TODO：有bug，会把前面的加到后面去？？
+def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10):
     blk_df = pd.read_csv(blank)
     sam_df = pd.read_csv(sample)
     t0 = time.time()
@@ -101,14 +101,64 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
 
     # v2:对mz分组后组内逐行覆盖标签，用时126秒
     grouped = output_unique.groupby('mz')
+    min_length = 5  # TODO:为调试参数
+    indices_to_drop = set()
     for name, group in grouped:
+        group.loc[group.index, 'label'] = label
         output_unique.loc[group.index, 'label'] = label
-        # v3:组内找到断点后对剩余label统一更新，避免逐行做加法，用时61秒
-        for i in range(1, len(group)):
-            if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > n:
+        # next_start = 0
+        # indices_to_drop = []
+        # # v3:组内遍历找到断点后对剩余label统一更新，避免逐行做加法，用时61秒
+        # for i in range(1, len(group)):
+        #     if group.iloc[i]['scan'] - group.iloc[i - 1]['scan'] > n:  # 断点大于n个断开
+        #         if (group.iloc[next_start:i]['label'] == label).sum() < 5:  # v3.1:长度大于m个才保留，增加这步后，多用时220秒..
+        #             indices_to_drop.extend(group.iloc[:i].index[group.iloc[:i]['label'] == label])
+        #             next_start = i
+        #         else:
+        #             label += 1
+        #             group.loc[group.index[i:], 'label'] = label
+        #             output_unique.loc[group.index[i:], 'label'] = label
+        #     if (group.iloc[next_start:]['label'] == label).sum() < 5:  # 对group中的最后一段判断
+        #         indices_to_drop.extend(group.iloc[next_start:].index[group.iloc[next_start:]['label'] == label])
+        #         label -= 1
+        # group.drop(indices_to_drop, inplace=True)
+        # output_unique.drop(indices_to_drop, inplace=True)
+        # label += 1  # 每个mz组结束后，增加label
+
+        # V4:使用where来检查断点，分片+长度检测共41秒！
+        diffs = group['scan'].diff().fillna(0)
+        first_indice = group.index[0]
+        break_points = np.where(diffs > n)[0] + first_indice  # 断点大于n的位置
+        for i, break_point in enumerate(break_points):
+            start = first_indice if i == 0 else break_points[i - 1]
+            end = break_point
+            segment_length = end - start  # 判断分段长度并标记删除
+            if segment_length < min_length:
+                indices_to_drop.update(range(start, end))
+            else:
+                group.loc[start:end, 'label'] = label
+                output_unique.loc[start:end, 'label'] = label
                 label += 1
-                output_unique.loc[group.index[i:], 'label'] = label
-        label += 1  # 每个mz组结束后，增加label
+
+        if break_points.size > 0:  # 处理最后一段
+            start = break_points[-1]
+            end = len(group) + first_indice
+            segment_length = end - start
+            if segment_length < min_length:
+                indices_to_drop.update(range(start, end))
+            else:
+                group.loc[start:end, 'label'] = label
+                output_unique.loc[start:end, 'label'] = label
+                label += 1
+        else:  # 如果没有断点，处理整个group
+            if len(group) < min_length:
+                indices_to_drop.update(range(first_indice, len(group)+first_indice))
+            else:
+                output_unique.loc[group.index, 'label'] = label
+                label += 1
+
+    output_unique.drop(indices_to_drop, inplace=True, errors='ignore')
+    output_unique.reset_index(drop=True, inplace=True)
     t2 = time.time()
     print('processing:', t1-t0)
     print('peak picking:', t2-t1)
