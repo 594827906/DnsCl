@@ -6,7 +6,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from utils.threading import Worker
 from background_subtract import denoise_bg
-from peak_extraction_by_scan import neut_loss, obtain_MS2, match_all_MS2, match_one_MS2
+from peak_extraction_by_peak import neut_loss, obtain_MS2, match_all_MS2, match_one_MS2
 from view_from_processed import tic_from_csv
 import pyteomics.mzxml as mzxml
 import numpy as np
