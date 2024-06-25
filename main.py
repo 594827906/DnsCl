@@ -11,6 +11,7 @@ from preprocess import defect_process
 from background_subtract import denoise_bg
 from show_eic_window import eic_window, ClickableListWidget
 from view_from_processed import tic_from_csv
+from validation import validation
 
 
 class MainWindow(PlotWindow):
@@ -25,6 +26,7 @@ class MainWindow(PlotWindow):
 
         self.opened_mzxml = []
         self.opened_csv = []
+        self.opened_val = []
 
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self._list_of_mzxml.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
@@ -58,32 +60,14 @@ class MainWindow(PlotWindow):
         csv_import = QtWidgets.QAction('Open processed file (*.csv)', self)
         csv_import.triggered.connect(self._open_csv)
         file.addAction(csv_import)
+        # 导入用于验证的文件(csv)
+        csv_import = QtWidgets.QAction('Open ground truth file (*.csv)', self)
+        csv_import.triggered.connect(self._open_val)
+        file.addAction(csv_import)
         # 选择保存目录
         save_path = QtWidgets.QAction('Choose a directory as default saving path', self)
         save_path.triggered.connect(self._saving_path)
         file.addAction(save_path)
-
-        # file_export = QtWidgets.QMenu('Save', self)
-        # # 导出当前图谱为图片
-        # file_export_features_png = QtWidgets.QAction('Save current spectrogram as *.png files', self)
-        # file_export_features_png.triggered.connect(partial(self._export_features, 'png'))
-        # file_export.addAction(file_export_features_png)
-        # # 导出当前图谱为新mzml
-        # file_export_features_mzml = QtWidgets.QAction('Save current spectrogram as new *.mzxml files', self)
-        # file_export_features_mzml.triggered.connect(partial(self._export_features, 'mzxml'))
-        # file_export.addAction(file_export_features_mzml)
-        # # 导出最终csv
-        # file_export_features_csv = QtWidgets.QAction('Save current spectrogram as *.csv files', self)
-        # file_export_features_csv.triggered.connect(partial(self._export_features, 'csv'))
-        # file_export.addAction(file_export_features_csv)
-
-        # file_clear = QtWidgets.QMenu('Clear', self)
-        # file_clear_features = QtWidgets.QAction('Clear panel with detected features', self)
-        # file_clear_features.triggered.connect(self._list_of_features.clear)
-        # file_clear.addAction(file_clear_features)
-
-        # file.addMenu(file_export)
-        # file.addMenu(file_clear)
 
         # background subtraction denoise(step2&3)
         denoise = menu.addMenu('Denoising')
@@ -108,6 +92,9 @@ class MainWindow(PlotWindow):
         matching.addAction(fragment_identify)
         matching.addAction(isotope_differential)
 
+        validation = menu.addAction('Validation')
+        validation.triggered.connect(self.validation)
+
     def init_ui(self):
         self.setWindowTitle('DnsCl')
 
@@ -117,12 +104,16 @@ class MainWindow(PlotWindow):
         self._list_of_mzxml = FileListWidget()
         process_list_label = QtWidgets.QLabel('Processed file list：')
         self._list_of_processed = FileListWidget()
+        ground_truth_list_label = QtWidgets.QLabel('Ground truth file list：')
+        self._list_of_val = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout(widget_left)
         layout_left.addWidget(mzxml_list_label)
-        layout_left.addWidget(self._list_of_mzxml, 2)
+        layout_left.addWidget(self._list_of_mzxml, 3)
         layout_left.addWidget(process_list_label)
         layout_left.addWidget(self._list_of_processed, 6)
+        layout_left.addWidget(ground_truth_list_label)
+        layout_left.addWidget(self._list_of_val, 1)
 
         # 中间布局
         widget_mid = QtWidgets.QWidget()
@@ -175,6 +166,12 @@ class MainWindow(PlotWindow):
             self._list_of_processed.addFile(name)
             self.opened_csv.append(name)
 
+    def _open_val(self):
+        files_names = QtWidgets.QFileDialog.getOpenFileNames(None, '', '', 'csv (*.csv)')[0]
+        for name in files_names:
+            self._list_of_val.addFile(name)
+            self.opened_val.append(name)
+
     def _saving_path(self):
         try:
             directory = str(QtWidgets.QFileDialog.getExistingDirectory(self, 'Choose a directory to save result'))
@@ -213,7 +210,7 @@ class MainWindow(PlotWindow):
 
     def mass_defect_limit(self):  # step 2
         try:
-            subwindow = defect_parawindow(self)
+            subwindow = simplify_parawindow(self)
             subwindow.show()
         except ValueError:
             # popup window with exception
@@ -265,6 +262,10 @@ class MainWindow(PlotWindow):
             msg.setText("Check parameters, something is wrong!")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec_()
+
+    def validation(self):
+        subwindow = val_win(self)
+        subwindow.show()
 
     # def plot_processed(self, item):
     #     file = item.text()  # 获取文件名
@@ -460,7 +461,7 @@ class FileListWidget(ClickableListWidget):
         return self.file2path[item.text()]
 
 
-class defect_parawindow(QtWidgets.QDialog):
+class simplify_parawindow(QtWidgets.QDialog):
     def __init__(self, parent: MainWindow):
         self.parent = parent
         super().__init__(self.parent)
@@ -866,6 +867,131 @@ class denoise_parawindow(QtWidgets.QDialog):
     def view_eic(self, df):
         subwindow = eic_window(self, df)
         subwindow.show()
+
+class val_win(QtWidgets.QDialog):
+    def __init__(self, parent: PlotWindow):
+        self.parent = parent
+        super().__init__(self.parent)
+        self.setWindowTitle('Validation option')
+        self._thread_pool = QtCore.QThreadPool()
+
+        # 字体设置
+        font = QtGui.QFont()
+        font.setFamily('Arial')
+        font.setBold(True)
+        font.setPixelSize(15)
+        font.setWeight(75)
+
+        files_layout = QtWidgets.QVBoxLayout()
+        result_choose_layout = QtWidgets.QHBoxLayout()
+        ground_choose_layout = QtWidgets.QHBoxLayout()
+        # 选择经过第二步处理的csv
+        choose_result_label = QtWidgets.QLabel()
+        choose_result_label.setText('Choose a .csv as result:')
+        choose_result_label.setFont(font)
+        self.result_file = QtWidgets.QComboBox()
+        self.result_file.addItems(self.parent.opened_csv)
+
+        choose_ground_label = QtWidgets.QLabel()
+        choose_ground_label.setText('Choose a .csv as ground truth:')
+        choose_ground_label.setFont(font)
+        self.ground_file = QtWidgets.QComboBox()
+        self.ground_file.addItems(self.parent.opened_val)
+
+        result_choose_layout.addWidget(self.result_file)
+        ground_choose_layout.addWidget(self.ground_file)
+        files_layout.addWidget(choose_result_label)
+        files_layout.addLayout(result_choose_layout)
+        files_layout.addWidget(choose_ground_label)
+        files_layout.addLayout(ground_choose_layout)
+
+        range_setting = QtWidgets.QFormLayout()
+
+        rt_label = QtWidgets.QLabel("RT window： ±")
+        rt_label.setFont(font)
+        self.rt_window = QtWidgets.QLineEdit()
+        self.rt_window.setText('30')
+        self.rt_window.setFixedSize(50, 30)
+        self.rt_window.setFont(font)
+        rt_layout = QtWidgets.QHBoxLayout()
+        rt_text = QtWidgets.QLabel(self)
+        rt_text.setText('s')
+        rt_text.setFont(font)
+        rt_layout.addWidget(self.rt_window)
+        rt_layout.addWidget(rt_text)
+
+        mz_label = QtWidgets.QLabel("m/z window： ±")
+        mz_label.setFont(font)
+        self.mz_window = QtWidgets.QLineEdit()
+        self.mz_window.setText('10')
+        self.mz_window.setFixedSize(50, 30)
+        self.mz_window.setFont(font)
+        mz_layout = QtWidgets.QHBoxLayout()
+        mz_text = QtWidgets.QLabel(self)
+        mz_text.setText('ppm')
+        mz_text.setFont(font)
+        mz_layout.addWidget(self.mz_window)
+        mz_layout.addWidget(mz_text)
+
+        range_setting.addRow(rt_label, rt_layout)
+        range_setting.addRow(mz_label, mz_layout)
+
+        ok_button = QtWidgets.QPushButton('OK')
+        ok_button.clicked.connect(self.val)
+        ok_button.setFont(font)
+        ok_button.resize(80, 80)  # 未生效
+
+        para_layout = QtWidgets.QVBoxLayout()
+        para_layout.addLayout(range_setting)
+        para_layout.addWidget(ok_button)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addLayout(files_layout)
+        layout.addLayout(para_layout)
+        self.setLayout(layout)
+
+    def val(self):
+        result = self.result_file.currentText()
+        ground = self.ground_file.currentText()
+        if len(result) == 0 or len(ground) == 0:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Choose files to validate!")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec_()
+        else:
+            try:
+                rt_win = float(self.rt_window.text())
+                mz_win = float(self.mz_window.text())
+                result_name = os.path.basename(result)
+                name, extension = os.path.splitext(result_name)
+                self.close()
+
+                worker = Worker('Validating...', validation, result, ground, mz_win*10e-7, rt_win/60)
+                # worker.signals.result.connect(partial(self.result_to_csv, name+'_val'))
+                # worker.signals.result.connect(self.view_eic)
+                worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
+                self._thread_pool.start(worker)
+            except ValueError:
+                # popup window with exception
+                msg = QtWidgets.QMessageBox(self)
+                msg.setText("Check parameters, something is wrong!")
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.exec_()
+
+    def result_to_csv(self, name, df):
+        suffix_start = 0
+        while True:
+            file_name = f"{name}-{suffix_start:02d}.csv"
+            if not os.path.exists(file_name):
+                df.to_csv(file_name, index=False)
+                break
+            else:
+                suffix_start += 1
+        self.parent._list_of_processed.addFile(file_name)
+        self.parent.opened_csv.append(file_name)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.exec_()
 
 
 style_sheet = """
