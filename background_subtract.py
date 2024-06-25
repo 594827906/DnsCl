@@ -104,6 +104,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
     grouped = output_sort.groupby('mz')
     min_length = 5  # TODO:为调试参数
     indices_to_drop = set()
+    rows_to_add = set()
     for name, group in grouped:
         group.loc[group.index, 'label'] = label
         output_sort.loc[group.index, 'label'] = label
@@ -126,18 +127,17 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
         # output_sort.drop(indices_to_drop, inplace=True)
         # label += 1  # 每个mz组结束后，增加label
 
-        # V4:使用where来检查断点，分片+长度检测共41秒！
-        diffs = group['scan'].diff().fillna(0)
+        # V4:使用where来检查断点，分片+长度检测共16秒！
+        diffs = group['scan'].diff().fillna(0)  # 计算连续行之间的差值
         first_indice = group.index[0]
         break_points = np.where(diffs > n)[0] + first_indice  # 断点大于n的位置
         for i, break_point in enumerate(break_points):
             start = first_indice if i == 0 else break_points[i - 1]
             end = break_point
             segment_length = end - start  # 判断分段长度并标记删除
-            if segment_length < min_length:
-                indices_to_drop.update(range(start, end))
-            else:
-                group.loc[start:end, 'label'] = label
+            if segment_length >= min_length:
+                rows_to_add.update(range(start, end))
+                # group.loc[start:end, 'label'] = label
                 output_sort.loc[start:end, 'label'] = label
                 label += 1
 
@@ -145,25 +145,25 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
             start = break_points[-1]
             end = len(group) + first_indice - 1
             segment_length = end - start + 1
-            if segment_length < min_length:
-                indices_to_drop.update(range(start, end+1))
-            else:
-                group.loc[start:end, 'label'] = label
+            if segment_length >= min_length:
+                rows_to_add.update(range(start, end+1))
+                # group.loc[start:end, 'label'] = label
                 output_sort.loc[start:end, 'label'] = label
                 label += 1
         else:  # 如果没有断点，处理整个group
-            if len(group) < min_length:
-                indices_to_drop.update(range(first_indice, len(group)+first_indice))
-            else:
+            if len(group) >= min_length:
+                rows_to_add.update(range(first_indice, len(group)+first_indice))
                 output_sort.loc[group.index, 'label'] = label
                 label += 1
 
-    output_sort.drop(indices_to_drop, inplace=True, errors='ignore')
-    output_sort.reset_index(drop=True, inplace=True)
+    indices_to_record = list(rows_to_add)
+    subtract_df = output_sort.loc[indices_to_record]
+    # output_sort.drop(indices_to_drop, inplace=True, errors='ignore')
+    # output_sort.reset_index(drop=True, inplace=True)
     t2 = time.time()
     print('processing:', t1-t0)
     print('peak picking:', t2-t1)
-    return output_sort
+    return subtract_df
 
 
 # read preprocessed data
