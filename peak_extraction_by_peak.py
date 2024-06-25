@@ -92,7 +92,7 @@ def obtain_MS2(mzXML_file):
 
 
 # ----------------------  function for  MS/MS matching----------------------- #
-def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与逻辑
+def match_all_MS2(rawdata, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 与逻辑
     values_str = fragments.split(',')  # 输入是字符串，按英文逗号分隔
     values = [float(num) for num in values_str]  # 转为浮点
     mz_tar_list = []
@@ -101,7 +101,7 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
     rt_tar_tensor = []
     mz_list = []
     rt_list = []
-    rows_to_add = []
+    rows_to_add = set()
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
@@ -112,7 +112,7 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
 
     # 对传入的所有目标值，查找容差内的 mz 值并记录
     for target in values:
-        index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]  # 提取包含 target1 的 index list
+        index = np.where(np.abs(ms2mz-target)/target < mz_tol)[0]  # 提取包含 target1 的 index list
         for ind in index:  # 将index list 中的 index 对应的 mz 和 rt 添加到数组中
             mz_tar_list.append(new_ms2.loc[ind, 'precusormz'])
             rt_tar_list.append(new_ms2.loc[ind, 'RT'])
@@ -131,31 +131,32 @@ def match_all_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 与
             mz_list.append(element)  # 将该值添加到 mz_list
             rt_list.append(rt_tar_tensor[0][ind])  # 将对应的rt添加到rt_list
 
-    # 获得 input_df 中的 mz, RT 和 intensity
-    mz_den = np.array(input_df['mz'])
-    rt_den = np.array(input_df['RT'])
-    intensity_den = np.array(input_df['intensity'])
     match_mz = []
     for i in np.arange(len(mz_list)):
-        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)[0]
-        if np.size(ind) >= 1:
-            # for p in np.arange(len(ind)):
-            #     temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
-            #     max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
-            inten = intensity_den[ind]
-            max_rt = rt_den[ind][np.argmax(inten)]
-            if np.abs(max_rt - rt_list[i]) <= tol_rt:
-                match_mz.extend(mz_den[ind])
-                rows_to_add.extend(ind)
-    fragment_df = input_df.loc[rows_to_add]
+        condition = ((input_df['mz'] >= mz_list[i] - mz_list[i] * mz_tol) &
+                     (input_df['mz'] <= mz_list[i] + mz_list[i] * mz_tol))
+        matched_label = input_df[condition]['label'].unique()
+        # ind = np.where(np.abs(mass - mz_list[i])/mz_list[i] < mz_tol)[0]
+        if np.size(matched_label) > 0:
+            for labels in matched_label:
+                sub_df = input_df[input_df['label'] == labels]
+                max_intensity_row = sub_df.loc[sub_df['intensity'].idxmax()]
+                max_rt = max_intensity_row['RT']
+                if np.abs(max_rt - rt_list[i]) <= tol_rt:
+                    mz = sub_df['mz'].unique()
+                    match_mz.extend(mz)
+                    rows_to_add.update(input_df[input_df['label'] == labels].index.tolist())
+    indices_to_record = list(rows_to_add)
+    fragment_df = input_df.loc[indices_to_record]
+    fragment_df = fragment_df.sort_values(by=['mz', 'scan']).reset_index(drop=True)
     return fragment_df  # np.unique(match_mz)用于验证
 
 
-def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或逻辑
+def match_one_MS2(rawdata, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 或逻辑
     values_str = fragments.split(',')
     values = [float(num) for num in values_str]
     ind_list = []
-    rows_to_add = []
+    rows_to_add = set()
     all_tar = set()  # 创建一个集合来存放所有满足条件的mz值
     input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
@@ -167,7 +168,7 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
     precusormz = np.array(new_ms2['precusormz'])
 
     for target in values:  # 对所有 target 值，找到数据中容差范围内的值，获取索引
-        index = np.where(np.abs(ms2mz-target)/target < tol_mz)[0]
+        index = np.where(np.abs(ms2mz-target)/target < mz_tol)[0]
         ind_list.append(index)
 
     for ind in ind_list:  # 对所有满足条件的索引，将mz值添加到数集中，形成并集
@@ -177,22 +178,24 @@ def match_one_MS2(rawdata, ms2_df, fragments, tol_mz=10e-6, tol_rt=30/60):  # 或
     mz_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['precusormz'])
     rt_list = np.array(ms2_df[ms2_df['precusormz'].isin(exist_precmz)]['RT'])
 
-    mz_den = np.array(input_df['mz'])
-    rt_den = np.array(input_df['RT'])
-    intensity_den = np.array(input_df['intensity'])
     match_mz = []
     for i in np.arange(len(mz_list)):
-        ind = np.where(np.abs(mz_den - mz_list[i])/mz_list[i] < tol_mz)[0]
-        if np.size(ind) >= 1:
-            # for p in np.arange(len(ind)):
-            #     temp_inten = np.array(intensity_den[ind][p][1:-1].split(','), dtype=np.float64)
-            #     max_rt = np.array(rt_den[ind][p][1:-1].split(','), dtype=np.float64)[np.argmax(temp_inten)]
-            inten = intensity_den[ind]
-            max_rt = rt_den[ind][np.argmax(inten)]
-            if np.abs(max_rt - rt_list[i]) <= tol_rt:
-                match_mz.extend(mz_den[ind])
-                rows_to_add.extend(ind)
-    fragment_df = input_df.loc[rows_to_add]
+        condition = ((input_df['mz'] >= mz_list[i] - mz_list[i] * mz_tol) &
+                     (input_df['mz'] <= mz_list[i] + mz_list[i] * mz_tol))
+        matched_label = input_df[condition]['label'].unique()
+        # ind = np.where(np.abs(mass - mz_list[i])/mz_list[i] < mz_tol)[0]
+        if np.size(matched_label) > 0:
+            for labels in matched_label:
+                sub_df = input_df[input_df['label'] == labels]
+                max_intensity_row = sub_df.loc[sub_df['intensity'].idxmax()]
+                max_rt = max_intensity_row['RT']
+                if np.abs(max_rt - rt_list[i]) <= tol_rt:
+                    mz = sub_df['mz'].unique()
+                    match_mz.extend(mz)
+                    rows_to_add.update(input_df[input_df['label'] == labels].index.tolist())
+    indices_to_record = list(rows_to_add)
+    fragment_df = input_df.loc[indices_to_record]
+    fragment_df = fragment_df.sort_values(by=['mz', 'scan']).reset_index(drop=True)
     return fragment_df  # np.unique(match_mz)用于验证
 
 # ------------- main ----------------#

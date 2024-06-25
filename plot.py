@@ -556,13 +556,13 @@ class match_parawindow2(QtWidgets.QDialog):
                 if mode == 'all of them':
                     self.close()
                     worker = Worker('Fragment feature matching...', obtain_MS2, self.path1)
-                    worker.signals.result.connect(partial(self.all, self.path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
+                    worker.signals.result.connect(partial(self.all, self.path2, fragments=fragment, mz_tol=mz_win*10e-7, tol_rt=rt_win/60))
                     worker.signals.close_signal.connect(worker.progress_dialog.close)
                     self._thread_pool.start(worker)
                 elif mode == 'one of them':
                     self.close()
                     worker = Worker('Fragment feature matching...', obtain_MS2, self.path1)
-                    worker.signals.result.connect(partial(self.one, self.path2, fragments=fragment, tol_mz=mz_win*10e-7, tol_rt=rt_win/60))
+                    worker.signals.result.connect(partial(self.one, self.path2, fragments=fragment, mz_tol=mz_win*10e-7, tol_rt=rt_win/60))
                     worker.signals.close_signal.connect(worker.progress_dialog.close)
                     self._thread_pool.start(worker)
                 else:
@@ -579,17 +579,17 @@ class match_parawindow2(QtWidgets.QDialog):
                 msg.setIcon(QtWidgets.QMessageBox.Warning)
                 msg.exec_()
 
-    def all(self, result, path2, fragments, tol_mz, tol_rt):
+    def all(self, result, path2, fragments, mz_tol, tol_rt):
         # 启动第二个后台任务处理 obtain_MS2 的结果
-        worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
+        worker2 = Worker('Fragment feature matching...', match_all_MS2, result, path2, fragments=fragments, mz_tol=mz_tol, tol_rt=tol_rt)
         # 链接逻辑all函数
         worker2.signals.result.connect(partial(self.result_to_csv, self.name+'_fragment_all'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
         self._thread_pool.start(worker2)
 
-    def one(self, result, path2, fragments, tol_mz, tol_rt):
+    def one(self, result, path2, fragments, mz_tol, tol_rt):
         # 启动第二个后台任务处理 obtain_MS2 的结果
-        worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, tol_mz=tol_mz, tol_rt=tol_rt)
+        worker2 = Worker('Fragment feature matching...', match_one_MS2, result, path2, fragments=fragments, mz_tol=mz_tol, tol_rt=tol_rt)
         # 连接逻辑or函数
         worker2.signals.result.connect(partial(self.result_to_csv, self.name+'_fragment_one'))
         worker2.signals.close_signal.connect(worker2.progress_dialog.close)
