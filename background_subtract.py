@@ -5,7 +5,7 @@ import numpy as np
 import time
 
 
-def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10):
+def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, break_len=10, min_len=5):
     blk_df = pd.read_csv(blank)
     sam_df = pd.read_csv(sample)
     t0 = time.time()
@@ -87,9 +87,7 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
     output_unique = output.drop_duplicates(subset=['scan', 'mz']).reset_index(drop=True)
     output_sort = output_unique.sort_values(by=['mz', 'scan']).reset_index(drop=True)
 
-    # output['label'] = 0
     label = 0
-    # unique_mz = output['mz'].unique()  # 获取唯一的mz值
     t1 = time.time()
     # v1:遍历每一行，用时155秒
     # for i in range(1, len(output)):
@@ -102,8 +100,6 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
 
     # v2:对mz分组后组内逐行覆盖标签，用时126秒
     grouped = output_sort.groupby('mz')
-    min_length = 5  # TODO:为调试参数
-    indices_to_drop = set()
     rows_to_add = set()
     for name, group in grouped:
         group.loc[group.index, 'label'] = label
@@ -130,12 +126,12 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
         # V4:使用where来检查断点，分片+长度检测共16秒！
         diffs = group['scan'].diff().fillna(0)  # 计算连续行之间的差值
         first_indice = group.index[0]
-        break_points = np.where(diffs > n)[0] + first_indice  # 断点大于n的位置
+        break_points = np.where(diffs > break_len)[0] + first_indice  # 断点大于break_len的位置
         for i, break_point in enumerate(break_points):
             start = first_indice if i == 0 else break_points[i - 1]
             end = break_point
             segment_length = end - start  # 判断分段长度并标记删除
-            if segment_length >= min_length:
+            if segment_length >= min_len:
                 rows_to_add.update(range(start, end))
                 # group.loc[start:end, 'label'] = label
                 output_sort.loc[start:end, 'label'] = label
@@ -145,13 +141,13 @@ def denoise_bg(blank, sample, tol_mass=10e-6, tol_rt=30/60, inten_ratio=10, n=10
             start = break_points[-1]
             end = len(group) + first_indice - 1
             segment_length = end - start + 1
-            if segment_length >= min_length:
+            if segment_length >= min_len:
                 rows_to_add.update(range(start, end+1))
                 # group.loc[start:end, 'label'] = label
                 output_sort.loc[start:end, 'label'] = label
                 label += 1
         else:  # 如果没有断点，处理整个group
-            if len(group) >= min_length:
+            if len(group) >= min_len:
                 rows_to_add.update(range(first_indice, len(group)+first_indice))
                 output_sort.loc[group.index, 'label'] = label
                 label += 1

@@ -31,6 +31,7 @@ class MainWindow(PlotWindow):
         # self._list_of_files.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self._list_of_mzxml.connectRightClick(partial(FileListMenu, self))  # 右键打开菜单
         self._list_of_processed.connectRightClick(partial(ProcessedListMenu, self))
+        self._list_of_val.connectRightClick(partial(GroundtruthListMenu, self))
         # self.list_of_processed.connectDoubleClick(self.plot_processed)  # 双击绘制TIC图
 
         if getattr(sys, 'frozen', False):
@@ -176,6 +177,9 @@ class MainWindow(PlotWindow):
         try:
             directory = str(QtWidgets.QFileDialog.getExistingDirectory(self, 'Choose a directory to save result'))
             os.chdir(directory)
+            msg = QtWidgets.QMessageBox(self)
+            msg.setText("Saving path has been changed to "+directory)
+            msg.exec_()
         except Exception:
             msg = QtWidgets.QMessageBox(self)
             msg.setText("Fail to change path")
@@ -286,6 +290,32 @@ class MainWindow(PlotWindow):
     #     fig.show()
 
 
+class GroundtruthListMenu(QtWidgets.QMenu):
+    def __init__(self, parent: MainWindow):
+        self.parent = parent
+        super().__init__(parent)
+
+        menu = QtWidgets.QMenu(parent)
+
+        close = QtWidgets.QAction('Close', parent)
+
+        menu.addAction(close)
+
+        action = menu.exec_(QtGui.QCursor.pos())
+
+        if action == close:
+            self.close_files()
+
+    def close_files(self):
+        for file in self.get_selected_files():
+            filename = file.text()
+            path = self.parent._list_of_val.file2path[filename]
+            self.parent.opened_val.remove(path)
+            self.parent._list_of_val.deleteFile(file)
+    def get_selected_files(self):
+        return self.parent._list_of_val.selectedItems()
+
+
 class ProcessedListMenu(QtWidgets.QMenu):
     def __init__(self, parent: MainWindow):
         self.parent = parent
@@ -345,14 +375,26 @@ class ProcessedListMenu(QtWidgets.QMenu):
             for file in self.get_selected_files():
                 file = file.text()
                 df = pd.read_csv(file)
-                grouped = df.groupby('label').apply(lambda x: pd.Series({
-                    'mz': x.iloc[0]['mz'],
-                    'scan': list(x['scan']),
-                    'intensity': list(x['intensity']),
-                    'RT': [x.iloc[0]['RT'], x.iloc[-1]['RT']]
-                })).reset_index()
-                subwindow = eic_window(self, grouped)
-                subwindow.show()
+                if df.empty:
+                    msg = QtWidgets.QMessageBox(self)
+                    msg.setText("The selected file doesn't have any feature")
+                    msg.setIcon(QtWidgets.QMessageBox.Warning)
+                    msg.exec_()
+                elif 'label' in df.columns:
+                    grouped = df.groupby('label').apply(lambda x: pd.Series({
+                        'mz': x.iloc[0]['mz'],
+                        'scan': list(x['scan']),
+                        'intensity': list(x['intensity']),
+                        'RT': [x.iloc[0]['RT'], x.iloc[-1]['RT']]
+                    })).reset_index()
+                    subwindow = eic_window(self, grouped)
+                    subwindow.show()
+                else:
+                    msg = QtWidgets.QMessageBox(self)
+                    msg.setText("The selected file does not support EIC plot")
+                    msg.setIcon(QtWidgets.QMessageBox.Warning)
+                    msg.exec_()
+
 
         if action == close:
             self.close_files()
@@ -672,7 +714,7 @@ class simplify_parawindow(QtWidgets.QDialog):
         self.parent._list_of_processed.addFile(file_name)
         self.parent.opened_csv.append(file_name)
         msg = QtWidgets.QMessageBox(self)
-        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.setText("Result has been saved as " + file_name + " !")
         msg.exec_()
 
 
@@ -769,8 +811,8 @@ class denoise_parawindow(QtWidgets.QDialog):
         ratio_layout.addWidget(ratio_text)
         ratio_layout.addStretch()  # 什么用处？
 
-        breakpoint_setting = QtWidgets.QFormLayout()
-        breakpoint_setting.alignment()
+        points_setting = QtWidgets.QFormLayout()
+        points_setting.alignment()
 
         breakpoint_label = QtWidgets.QLabel("Cut the section at： ")
         breakpoint_label.setFont(font)
@@ -785,12 +827,26 @@ class denoise_parawindow(QtWidgets.QDialog):
         breakpoint_layout.addWidget(self.breakpoint)
         breakpoint_layout.addWidget(breakpoint_text)
 
+        min_len_label = QtWidgets.QLabel("Keep features longer than： ")
+        min_len_label.setFont(font)
+        self.min_len = QtWidgets.QLineEdit()
+        self.min_len.setText('5')
+        self.min_len.setFixedSize(50, 30)
+        self.min_len.setFont(font)
+        min_len_layout = QtWidgets.QHBoxLayout()
+        min_len_text = QtWidgets.QLabel(self)
+        min_len_text.setText('points')
+        min_len_text.setFont(font)
+        min_len_layout.addWidget(self.min_len)
+        min_len_layout.addWidget(min_len_text)
+
         range_setting.addRow(rt_label, rt_layout)
         range_setting.addRow(mz_label, mz_layout)
         # range_setting.setLabelAlignment(Q)
 
         ratio_setting.addRow(ratio_label, ratio_layout)
-        breakpoint_setting.addRow(breakpoint_label, breakpoint_layout)
+        points_setting.addRow(breakpoint_label, breakpoint_layout, )
+        points_setting.addRow(min_len_label, min_len_layout)
 
         ok_button = QtWidgets.QPushButton('OK')
         ok_button.clicked.connect(self.denoise)
@@ -800,7 +856,7 @@ class denoise_parawindow(QtWidgets.QDialog):
         para_layout = QtWidgets.QVBoxLayout()
         para_layout.addLayout(range_setting)
         para_layout.addLayout(ratio_setting)
-        para_layout.addLayout(breakpoint_setting)
+        para_layout.addLayout(points_setting)
         para_layout.addWidget(ok_button)
 
         layout = QtWidgets.QVBoxLayout()
@@ -832,12 +888,13 @@ class denoise_parawindow(QtWidgets.QDialog):
                 mz_win = float(self.mz_window.text())
                 ratio = float(self.ratio.text())
                 breakpoint = int(self.breakpoint.text())
+                min_len = int(self.min_len.text())
                 sample_name = os.path.basename(sample)
                 name, extension = os.path.splitext(sample_name)
                 self.close()
 
                 worker = Worker('Background subtract denoising...', denoise_bg,
-                                blank, sample, mz_win*10e-7, rt_win/60, ratio, n=breakpoint)
+                                blank, sample, mz_win*10e-7, rt_win/60, ratio, break_len=breakpoint, min_len=min_len)
                 worker.signals.result.connect(partial(self.result_to_csv, name+'_denoised'))
                 # worker.signals.result.connect(self.view_eic)
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
@@ -861,7 +918,7 @@ class denoise_parawindow(QtWidgets.QDialog):
         self.parent._list_of_processed.addFile(file_name)
         self.parent.opened_csv.append(file_name)
         msg = QtWidgets.QMessageBox(self)
-        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.setText("Result has been saved as " + file_name + " !")
         msg.exec_()
 
     def view_eic(self, df):
@@ -983,7 +1040,7 @@ class val_win(QtWidgets.QDialog):
         matchsum = str(matchsum)
         match_mz = str(match_mz)
         msg = QtWidgets.QMessageBox(self)
-        msg.setText('finding parent ion mz:'+matchsum+'\n'+match_mz)
+        msg.setText('finding parent ion mz: '+matchsum+'\n'+match_mz)
         msg.exec_()
 
     def result_to_csv(self, name, df):
@@ -998,7 +1055,7 @@ class val_win(QtWidgets.QDialog):
         self.parent._list_of_processed.addFile(file_name)
         self.parent.opened_csv.append(file_name)
         msg = QtWidgets.QMessageBox(self)
-        msg.setText("Result has been saved as " + file_name + " successfully!")
+        msg.setText("Result has been saved as " + file_name + " !")
         msg.exec_()
 
 

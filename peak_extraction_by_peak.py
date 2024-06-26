@@ -13,29 +13,29 @@ import pyteomics.mzxml as mzxml
 
 
 # ------------function for checking neutral loss----------------------- #
-def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
-    input_df = pd.read_csv(file)
+def neut_loss(input_df, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
+    # input_df = pd.read_csv(file)
 
     mass = input_df['mz'].unique()
-    rt = np.array(input_df['RT'])
-    intensity = np.array(input_df['intensity'])
+    # rt = np.array(input_df['RT'])
+    # intensity = np.array(input_df['intensity'])
 
-    matchmz = []
+    # match_mz = []
     indices_to_record = []
-    num_peak = 0
+    # num_peak = 0
 
     for mz in mass:
         mass_nl = mz - NL
 
-        # 找到满足 mz=mass_nl±mz_tol 的所有行并获取label（mz_tol是百分比？）
+        # 找到满足 mz=mass_nl±mz_tol 的所有行并获取label
         condition_nl = (input_df['mz'] >= mass_nl - mass_nl*mz_tol) & (input_df['mz'] <= mass_nl + mass_nl*mz_tol)
         labels_nl = input_df[condition_nl]['label'].unique()
 
-        # 找到满足 mz=mass 的所有行并获取label
-        condition_mass = input_df['mz'] == mz
-        labels_mass = input_df[condition_mass]['label'].unique()
+        if len(labels_nl) > 0:  # 如果存在中性丢失值，进行下一步
+            # 找到满足 mz=mass 的所有行并获取label
+            condition_mass = input_df['mz'] == mz
+            labels_mass = input_df[condition_mass]['label'].unique()
 
-        if len(labels_nl) > 0:  # 如果存在中性丢失值，则作RT判断
             # 对于每个label组，找到intensity最大值处的RT
             max_intensity_rt_nl = {}
             for label in labels_nl:
@@ -49,17 +49,18 @@ def neut_loss(file, NL=63.96135, rt_tol=30/60, mz_tol=10e-6):
                 max_intensity_row = sub_df.loc[sub_df['intensity'].idxmax()]
                 max_intensity_rt_mass[label] = max_intensity_row['RT']
 
-            # 对比 RT 差值，如果差值小于 rt_tol，则记录这一mz的label的所有行的 index
+            # 如果RT差值小于 rt_tol，则记录这一mz的label的所有行的 index
             for l_mass in labels_mass:
                 for l_nl in labels_nl:
                     rt_diff = abs(max_intensity_rt_mass[l_mass] - max_intensity_rt_nl[l_nl])
                     if rt_diff < rt_tol:
                         indices_to_record.extend(input_df[input_df['label'] == l_mass].index.tolist())
+                        # match_mz.extend(mz)
 
     nl_df = input_df.loc[indices_to_record]
     # print('num of peaks be found by neutral loss:', num_peak)
-    # print('matched mass:', matchmz)
-    return nl_df  # matchmz用于验证
+    # print('matched mass:', match_mz)
+    return nl_df  # match_mz用于验证
 
 
 # -------------------prepare for plot MS/MS----------------------- #
@@ -92,7 +93,7 @@ def obtain_MS2(mzXML_file):
 
 
 # ----------------------  function for  MS/MS matching----------------------- #
-def match_all_MS2(rawdata, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 与逻辑
+def match_all_MS2(input_df, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 与逻辑
     values_str = fragments.split(',')  # 输入是字符串，按英文逗号分隔
     values = [float(num) for num in values_str]  # 转为浮点
     mz_tar_list = []
@@ -102,7 +103,7 @@ def match_all_MS2(rawdata, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 与
     mz_list = []
     rt_list = []
     rows_to_add = set()
-    input_df = pd.read_csv(rawdata)
+    # input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
     new_ms2 = pd.concat([new_left, new_right], axis=1)
@@ -152,13 +153,13 @@ def match_all_MS2(rawdata, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 与
     return fragment_df  # np.unique(match_mz)用于验证
 
 
-def match_one_MS2(rawdata, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 或逻辑
+def match_one_MS2(input_df, ms2_df, fragments, mz_tol=10e-6, tol_rt=30/60):  # 或逻辑
     values_str = fragments.split(',')
     values = [float(num) for num in values_str]
     ind_list = []
     rows_to_add = set()
     all_tar = set()  # 创建一个集合来存放所有满足条件的mz值
-    input_df = pd.read_csv(rawdata)
+    # input_df = pd.read_csv(rawdata)
     new_left = ms2_df[['RT', 'intensity']].explode('intensity').reset_index(drop=True)
     new_right = ms2_df[['MS2mz', 'precusormz']].explode('MS2mz').reset_index(drop=True)
     new_ms2 = pd.concat([new_left, new_right], axis=1)

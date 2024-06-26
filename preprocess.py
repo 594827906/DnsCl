@@ -186,7 +186,6 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
 
                 if (np.max(test_intensity) - np.min(test_intensity)) / np.min(test_intensity) > var_ratio:
                     temp = pd.DataFrame({
-                        'label': np.array(feat_labels[feat_labels == i]),
                         'scan': scan4var[feat_labels == i],
                         'RT': rt4var[feat_labels == i],
                         'mz': mass4var[feat_labels == i],
@@ -199,12 +198,9 @@ def refine_group(onegroup, n_scan=10, n_rep=7, var_ratio=0.1):
 
 def check_rep_var(input_df):
     # initial peak label
-    input_df['label'] = np.array([0] * len(input_df))
-    t0 = time.time()
+    # input_df['label'] = np.array([0] * len(input_df))
     # grouping mass
     grouped_data = input_df.groupby('mz').apply(refine_group)
-    t1 = time.time()
-    print("mz group", t1 - t0)
     return grouped_data
 
 
