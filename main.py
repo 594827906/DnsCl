@@ -968,7 +968,7 @@ class val_win(QtWidgets.QDialog):
 
                 worker = Worker('Validating...', validation, result, ground, mz_win*10e-7, rt_win/60)
                 # worker.signals.result.connect(partial(self.result_to_csv, name+'_val'))
-                # worker.signals.result.connect(self.view_eic)
+                worker.signals.result.connect(self.show_result)
                 worker.signals.close_signal.connect(worker.progress_dialog.close)  # 连接关闭信号到关闭进度条窗口函数
                 self._thread_pool.start(worker)
             except ValueError:
@@ -977,6 +977,14 @@ class val_win(QtWidgets.QDialog):
                 msg.setText("Check parameters, something is wrong!")
                 msg.setIcon(QtWidgets.QMessageBox.Warning)
                 msg.exec_()
+
+    def show_result(self, match):
+        matchsum, match_mz = match
+        matchsum = str(matchsum)
+        match_mz = str(match_mz)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText('finding parent ion mz:'+matchsum+'\n'+match_mz)
+        msg.exec_()
 
     def result_to_csv(self, name, df):
         suffix_start = 0

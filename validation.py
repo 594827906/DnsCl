@@ -18,3 +18,6 @@ def validation(result, ground, mz_tol, rt_tol):
 
     print('finding parent ion mz:', matchsum)
     print(match_mz)
+    match = (matchsum, match_mz)
+
+    return match
