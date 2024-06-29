@@ -27,6 +27,12 @@ class eic_window(QtWidgets.QDialog):
         self.feature_list.setHorizontalHeaderLabels(self.df.columns)
         self.add_dataframe_to_listwidget(df)
 
+        # 设置表头可点击，并连接到排序功能
+        self.feature_list.setSortingEnabled(True)
+        header = self.feature_list.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Interactive)  # 可以手动调整列宽
+        header.sectionClicked.connect(self.sort_by_column)
+
         # self.feature_list.connectRightClick(self.file_right_click)
         # self.feature_list.connectDoubleClick(self.file_double_click)
         self._init_ui()  # initialize user interface
@@ -56,9 +62,26 @@ class eic_window(QtWidgets.QDialog):
 
         # feature list layout
         widget_feature = QtWidgets.QWidget()
+        feature_list_layout = QtWidgets.QVBoxLayout(widget_feature)
+        # 创建查找输入框和按钮
+        search_widget = QtWidgets.QWidget()
+        search_layout = QtWidgets.QHBoxLayout(search_widget)
+
+        self.column_combo_box = QtWidgets.QComboBox()
+        self.column_names = ["mz", "RT"]
+        self.column_combo_box.addItems(self.column_names)
+
+        self.search_bar = QtWidgets.QLineEdit(self)
+        self.search_bar.setPlaceholderText("Enter search content...")
+        self.search_button = QtWidgets.QPushButton("Search")
+        self.search_button.clicked.connect(self.search)
+        search_layout.addWidget(self.column_combo_box)
+        search_layout.addWidget(self.search_bar)
+        search_layout.addWidget(self.search_button)
+
         feature_label = QtWidgets.QLabel('Feature list：')
         feature_label.setFont(font)
-        feature_list_layout = QtWidgets.QVBoxLayout(widget_feature)
+        feature_list_layout.addWidget(search_widget)
         feature_list_layout.addWidget(feature_label)
         feature_list_layout.addWidget(self.feature_list)
         self.feature_list.cellClicked.connect(self.plot_chosen)
@@ -66,8 +89,8 @@ class eic_window(QtWidgets.QDialog):
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         splitter.addWidget(widget_canvas)
         splitter.addWidget(widget_feature)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 3)
         splitter.setStyleSheet(
             """
                 QSplitter::handle {
@@ -114,6 +137,31 @@ class eic_window(QtWidgets.QDialog):
                 item = QtWidgets.QTableWidgetItem(str(value))
                 item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)  # 设为不可编辑
                 self.feature_list.setItem(row_index, col_index, item)
+
+    def sort_by_column(self, logicalIndex):
+        # 获取当前排序顺序
+        order = self.feature_list.horizontalHeader().sortIndicatorOrder()
+        self.feature_list.sortItems(logicalIndex, order)
+
+    def search(self):
+        search_text = self.search_bar.text().lower()
+        search_key = self.column_combo_box.currentText()
+        for i in range(self.feature_list.columnCount()):
+            if self.feature_list.horizontalHeaderItem(i).text() == search_key:
+                col = i
+        if search_text is not None:
+            for row in range(self.feature_list.rowCount()):
+                match = False
+                item = self.feature_list.item(row, col)
+                if item is not None:
+                    if search_text in item.text().lower():
+                        match = True
+                        item.setBackground(QtGui.QColor('yellow'))  # 高亮匹配项
+                        self.feature_list.showRow(row)
+                    else:
+                        item.setBackground(QtGui.QColor('white'))  # 取消高亮
+                        self.feature_list.hideRow(row)
+
 
     def get_chosen(self):
         chosen_item = None
