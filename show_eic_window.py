@@ -72,7 +72,6 @@ class eic_window(QtWidgets.QDialog):
         self.column_combo_box.addItems(self.column_names)
 
         self.search_bar = QtWidgets.QLineEdit(self)
-        self.search_bar.setPlaceholderText("Enter search content...")
         self.search_button = QtWidgets.QPushButton("Search")
         self.search_button.clicked.connect(self.search)
         search_layout.addWidget(self.column_combo_box)
@@ -144,24 +143,29 @@ class eic_window(QtWidgets.QDialog):
         self.feature_list.sortItems(logicalIndex, order)
 
     def search(self):
-        search_text = self.search_bar.text().lower()
+        search_text = self.search_bar.text()
         search_key = self.column_combo_box.currentText()
         for i in range(self.feature_list.columnCount()):
             if self.feature_list.horizontalHeaderItem(i).text() == search_key:
                 col = i
-        if search_text is not None:
+        if len(search_text) > 0:
             for row in range(self.feature_list.rowCount()):
                 match = False
                 item = self.feature_list.item(row, col)
                 if item is not None:
-                    if search_text in item.text().lower():
+                    if search_text in item.text():
                         match = True
                         item.setBackground(QtGui.QColor('yellow'))  # 高亮匹配项
                         self.feature_list.showRow(row)
                     else:
                         item.setBackground(QtGui.QColor('white'))  # 取消高亮
                         self.feature_list.hideRow(row)
-
+        else:
+            for row in range(self.feature_list.rowCount()):
+                item = self.feature_list.item(row, col)
+                if item is not None:
+                    item.setBackground(QtGui.QColor('white'))  # 取消高亮
+                    self.feature_list.showRow(row)
 
     def get_chosen(self):
         chosen_item = None
