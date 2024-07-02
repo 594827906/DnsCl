@@ -176,14 +176,17 @@ class eic_window(QtWidgets.QDialog):
     def plot_chosen(self, row, column):
         try:
             # 获取对应的 DataFrame 行数据
-            row_data = self.df.iloc[row]
+            label_item = self.feature_list.item(row, 0)
+            label_value = label_item.text() if label_item else ''
 
-            mz = row_data['mz']
-            intensity = row_data['intensity']
-            RT = row_data['RT']
+            row_data = self.df[self.df['label'] == int(label_value)]
+
+            mz = row_data['mz'].iloc[0]
+            intensity = row_data['intensity'].iloc[0]
+            RT = row_data['RT'].iloc[0]
             RT_min = RT[0]
             RT_max = RT[-1]
-            scan = row_data['scan']
+            scan = row_data['scan'].iloc[0]
             scan_min = scan[0]
             scan_max = scan[-1]
 
