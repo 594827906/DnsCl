@@ -66,7 +66,7 @@ class MainWindow(PlotWindow):
         csv_import.triggered.connect(self._open_val)
         file.addAction(csv_import)
         # 选择保存目录
-        save_path = QtWidgets.QAction('Choose a directory as default saving path', self)
+        save_path = QtWidgets.QAction('Change work directory (to save results automatically)', self)
         save_path.triggered.connect(self._saving_path)
         file.addAction(save_path)
 
@@ -97,15 +97,45 @@ class MainWindow(PlotWindow):
         validation.triggered.connect(self.validation)
 
     def init_ui(self):
+
+        # 字体设置
+        font = QtGui.QFont()
+        # font.setFamily('Times New Roman')
+        # font.setBold(True)
+        font.setPixelSize(12)
+        # font.setWeight(75)
+
         self.setWindowTitle('DnsCl')
+
+
+        # 上方布局
+        work_path_layout = QtWidgets.QHBoxLayout()
+        work_path_label = QtWidgets.QLabel('Current working directory: ')
+        # work_path_label.setFont(font)
+        self.work_path = QtWidgets.QLabel(os.path.abspath('.'))
+        # self.work_path.setFont(font)
+        work_path_layout.addWidget(work_path_label)
+        work_path_layout.addWidget(self.work_path)
+
+        work_path_widget = QtWidgets.QWidget()  # 转为widget，用于控制大小
+        work_path_widget.setLayout(work_path_layout)
+        label_size = work_path_layout.sizeHint()  # 获取layout的首选大小
+        work_path_widget.setFixedSize(label_size.width(), label_size.height())  # 设置 work_path_widget 的固定大小
+        work_path_label.setAlignment(QtCore.Qt.AlignLeft)
+        work_path_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Ignored)
+        self.work_path.setAlignment(QtCore.Qt.AlignLeft)
+        self.work_path.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Ignored)
 
         # 左侧布局
         widget_left = QtWidgets.QWidget()
         mzxml_list_label = QtWidgets.QLabel('.mzXML file list：')
+        mzxml_list_label.setFont(font)
         self._list_of_mzxml = FileListWidget()
         process_list_label = QtWidgets.QLabel('Processed file list：')
+        process_list_label.setFont(font)
         self._list_of_processed = FileListWidget()
         ground_truth_list_label = QtWidgets.QLabel('Ground truth file list：')
+        ground_truth_list_label.setFont(font)
         self._list_of_val = FileListWidget()
 
         layout_left = QtWidgets.QVBoxLayout(widget_left)
@@ -141,6 +171,7 @@ class MainWindow(PlotWindow):
             """)
 
         main_layout = QtWidgets.QVBoxLayout()
+        main_layout.addWidget(work_path_widget)
         main_layout.addWidget(splitter)
 
         # 主视窗布局
@@ -177,6 +208,7 @@ class MainWindow(PlotWindow):
         try:
             directory = str(QtWidgets.QFileDialog.getExistingDirectory(self, 'Choose a directory to save result'))
             os.chdir(directory)
+            self.work_path.setText(os.path.abspath('.'))
             msg = QtWidgets.QMessageBox(self)
             msg.setText("Saving path has been changed to "+directory)
             msg.exec_()
@@ -374,7 +406,8 @@ class ProcessedListMenu(QtWidgets.QMenu):
         if action == eic:
             for file in self.get_selected_files():
                 file = file.text()
-                df = pd.read_csv(file)
+                path = self.parent._list_of_processed.file2path[file]
+                df = pd.read_csv(path)
                 if df.empty:
                     msg = QtWidgets.QMessageBox(self)
                     msg.setText("The selected file doesn't have any feature")
