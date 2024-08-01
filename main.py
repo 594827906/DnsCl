@@ -428,7 +428,6 @@ class ProcessedListMenu(QtWidgets.QMenu):
                     msg.setIcon(QtWidgets.QMessageBox.Warning)
                     msg.exec_()
 
-
         if action == close:
             self.close_files()
         elif action == clear:

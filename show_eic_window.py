@@ -5,6 +5,10 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5 import QtWidgets, QtGui, QtCore
+from cnn.peak_evaluate import peak_eval
+import ast
+import csv
+import os
 
 
 class eic_window(QtWidgets.QDialog):
@@ -63,6 +67,7 @@ class eic_window(QtWidgets.QDialog):
         # feature list layout
         widget_feature = QtWidgets.QWidget()
         feature_list_layout = QtWidgets.QVBoxLayout(widget_feature)
+        button_layout = QtWidgets.QHBoxLayout()
         # 创建查找输入框和按钮
         search_widget = QtWidgets.QWidget()
         search_layout = QtWidgets.QHBoxLayout(search_widget)
@@ -80,9 +85,16 @@ class eic_window(QtWidgets.QDialog):
 
         feature_label = QtWidgets.QLabel('Feature list：')
         feature_label.setFont(font)
+        feature_eval = QtWidgets.QPushButton("Evaluate the peak shape")
+        feature_eval.clicked.connect(self.evaluate_df)
+        save_score = QtWidgets.QPushButton("Save current table as .csv")
+        save_score.clicked.connect(self.save_to_csv)
+        button_layout.addWidget(feature_eval)
+        button_layout.addWidget(save_score)
         feature_list_layout.addWidget(search_widget)
         feature_list_layout.addWidget(feature_label)
         feature_list_layout.addWidget(self.feature_list)
+        feature_list_layout.addLayout(button_layout)
         self.feature_list.cellClicked.connect(self.plot_chosen)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -166,6 +178,111 @@ class eic_window(QtWidgets.QDialog):
                 if item is not None:
                     item.setBackground(QtGui.QColor('white'))  # 取消高亮
                     self.feature_list.showRow(row)
+
+    def evaluate_table(self):
+        row_count = self.feature_list.rowCount()
+        col_count = self.feature_list.columnCount()
+        self.feature_list.setColumnCount(col_count + 1)
+        self.feature_list.setHorizontalHeaderItem(col_count, QtWidgets.QTableWidgetItem("score"))
+        for row in range(row_count):
+            scan_item = self.feature_list.item(row, 2)
+            inten_item = self.feature_list.item(row, 3)
+            if scan_item is not None:
+                scan_txt = str(scan_item.text())
+                scan_arr = ast.literal_eval(scan_txt)
+
+                inten_txt = str(inten_item.text())
+                inten_arr = ast.literal_eval(inten_txt)
+                # min_val = min(inten_arr)
+                # normalized_y = [x - min_val for x in inten_arr]  # 使最小值为0
+
+                # scan_min = scan_arr[0]
+                # scan_max = scan_arr[-1]
+                diff = np.diff(scan_arr)  # 计算相邻元素的差值
+                break_point = np.where(diff != 1)[0] + 1  # 找到差值不为1的索引，即不连续点的位置。+1是因为diff结果的长度比data短1
+                missing_point = diff[break_point - 1] - 1
+                missing_point = missing_point.astype(int)
+                offset = 0
+                for index, count in zip(break_point, missing_point):
+                    for _ in range(count):
+                        # scan_arr = np.insert(scan_arr, index + offset, 0)
+                        offset += 1
+                        inten_arr = np.insert(inten_arr, index + offset - 1, 0)
+                # scan_arr = np.arange(scan_min, scan_max + 1)
+
+                intensity = np.pad(inten_arr, (3, 3), 'constant', constant_values=(0, 0))
+
+                score = peak_eval(orin_inten=intensity)
+                self.feature_list.setItem(row, col_count, QtWidgets.QTableWidgetItem(str(score)))
+
+    def evaluate_df(self):
+        score_arr = []
+        col_count = self.feature_list.columnCount()
+        self.feature_list.setColumnCount(col_count + 1)
+        self.feature_list.setHorizontalHeaderItem(col_count, QtWidgets.QTableWidgetItem("score"))
+        for row_index, row in self.df.iterrows():
+            scan = self.df['scan'][row_index]
+            inten = self.df['intensity'][row_index]
+
+            # min_val = min(inten_arr)
+            # normalized_y = [x - min_val for x in inten_arr]  # 使最小值为0
+
+            # scan_min = scan_arr[0]
+            # scan_max = scan_arr[-1]
+            diff = np.diff(scan)  # 计算相邻元素的差值
+            break_point = np.where(diff != 1)[0] + 1  # 找到差值不为1的索引，即不连续点的位置。+1是因为diff结果的长度比data短1
+            missing_point = diff[break_point - 1] - 1
+            missing_point = missing_point.astype(int)
+            offset = 0
+            for index, count in zip(break_point, missing_point):
+                for _ in range(count):
+                    # scan_arr = np.insert(scan_arr, index + offset, 0)
+                    offset += 1
+                    inten = np.insert(inten, index + offset - 1, 0)
+            # scan_arr = np.arange(scan_min, scan_max + 1)
+
+            intensity = np.pad(inten, (3, 3), 'constant', constant_values=(0, 0))
+
+            score = peak_eval(orin_inten=intensity)
+            score_arr.append(score)
+
+        self.df['score'] = score_arr
+        for row_index, row in self.df.iterrows():
+            for col_index, value in enumerate(row):
+                item = QtWidgets.QTableWidgetItem(str(value))
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)  # 设为不可编辑
+                self.feature_list.setItem(row_index, col_index, item)
+
+    def save_to_csv(self):
+        suffix_start = 0
+        name = 'score'
+        while True:
+            file_name = f"{name}-{suffix_start:02d}.csv"
+            if not os.path.exists(file_name):
+                self.df.to_csv(file_name, index=False)
+                break
+            else:
+                suffix_start += 1
+        msg = QtWidgets.QMessageBox(self)
+        msg.setText("Result has been saved as " + file_name + " !")
+        msg.exec_()
+        # path, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Save File', '', 'CSV(*.csv)')
+        # if path:
+        #     with open(path, mode='w', newline='') as file:
+        #         writer = csv.writer(file)
+        #         # Write header
+        #         header = [self.feature_list.horizontalHeaderItem(i).text() for i in range(self.feature_list.columnCount())]
+        #         writer.writerow(header)
+        #         # Write data
+        #         for row in range(self.feature_list.rowCount()):
+        #             row_data = []
+        #             for col in range(self.feature_list.columnCount()):
+        #                 item = self.feature_list.item(row, col)
+        #                 if item is not None:
+        #                     row_data.append(item.text())
+        #                 else:
+        #                     row_data.append('')
+        #             writer.writerow(row_data)
 
     def get_chosen(self):
         chosen_item = None
